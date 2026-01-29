@@ -792,6 +792,7 @@ dependencies = [
  "git2",
  "hostname",
  "libc",
+ "mac-notification-sys",
  "notify",
  "notify-debouncer-mini",
  "notify-rust",

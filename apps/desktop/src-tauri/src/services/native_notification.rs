@@ -39,6 +39,8 @@ pub struct TaskNotification {
 pub struct NativeNotificationService {
     #[cfg(target_os = "windows")]
     app_handle: Option<AppHandle>,
+    #[cfg(target_os = "macos")]
+    app_handle: Option<AppHandle>,
     #[cfg(target_os = "linux")]
     click_sender: Option<mpsc::UnboundedSender<NotificationClickPayload>>,
 }
@@ -60,6 +62,8 @@ impl NativeNotificationService {
 
         Self {
             #[cfg(target_os = "windows")]
+            app_handle,
+            #[cfg(target_os = "macos")]
             app_handle,
             #[cfg(target_os = "linux")]
             click_sender: None,
@@ -184,39 +188,59 @@ impl NativeNotificationService {
 
     #[cfg(target_os = "macos")]
     fn show_macos(&self, notification: TaskNotification) {
-        use std::{
-            process::Command,
-            sync::atomic::{AtomicUsize, Ordering},
-        };
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use mac_notification_sys::{Notification, NotificationResponse};
 
         // Limit concurrent notification threads to prevent resource exhaustion
         static ACTIVE_THREADS: AtomicUsize = AtomicUsize::new(0);
         const MAX_NOTIFICATION_THREADS: usize = 10;
 
+        let app_handle = match &self.app_handle {
+            Some(h) => h.clone(),
+            None => {
+                tracing::warn!("Cannot show notification with click handler: no app handle");
+                // Still show the notification without click handling
+                let result = Notification::new()
+                    .title(&notification.title)
+                    .message(&notification.body)
+                    .send();
+
+                if let Err(e) = result {
+                    tracing::warn!("Failed to show macOS notification: {:?}", e);
+                }
+                return;
+            }
+        };
+
         // Check thread limit before spawning
         let current = ACTIVE_THREADS.load(Ordering::SeqCst);
         if current >= MAX_NOTIFICATION_THREADS {
             tracing::warn!(
-                "Too many notification threads active ({}), dropping notification",
+                "Too many notification threads active ({}), showing without click handler",
                 current
             );
+            // Show notification without click handling to avoid dropping it
+            let result = Notification::new()
+                .title(&notification.title)
+                .message(&notification.body)
+                .send();
+
+            if let Err(e) = result {
+                tracing::warn!("Failed to show macOS notification: {:?}", e);
+            }
             return;
         }
 
         ACTIVE_THREADS.fetch_add(1, Ordering::SeqCst);
 
-        // On macOS, we use a hybrid approach:
-        // 1. Show the notification using osascript (AppleScript)
-        // 2. Use a polling mechanism or deep link scheme for click handling
-        //
-        // For now, we'll show the notification and emit a click event
-        // based on the app being activated after showing the notification.
-        // A more robust solution would involve implementing a native macOS
-        // notification delegate using objc or swift-rs.
-
+        let task_type = notification.task_type.as_str().to_string();
+        let task_id = notification.task_id.clone();
         let title = notification.title.clone();
         let body = notification.body.clone();
 
+        // macOS notifications with click handling need to be in a separate thread
+        // because send() blocks until the notification is interacted with or dismissed
         std::thread::spawn(move || {
             // Use a guard to ensure we decrement the counter on exit
             struct ThreadGuard;
@@ -227,45 +251,27 @@ impl NativeNotificationService {
             }
             let _guard = ThreadGuard;
 
-            // Use osascript to display a notification with sound
-            // Escape backslashes first, then quotes to prevent script injection
-            let escape_applescript =
-                |s: &str| -> String { s.replace('\\', "\\\\").replace('"', "\\\"") };
-            let script = format!(
-                r#"display notification "{}" with title "{}""#,
-                escape_applescript(&body),
-                escape_applescript(&title)
-            );
-
-            let result = Command::new("osascript").args(["-e", &script]).output();
+            let result = Notification::new()
+                .title(&title)
+                .message(&body)
+                .send();
 
             match result {
-                Ok(output) => {
-                    if !output.status.success() {
-                        tracing::warn!(
-                            "osascript notification failed: {}",
-                            String::from_utf8_lossy(&output.stderr)
-                        );
+                Ok(response) => {
+                    tracing::debug!("macOS notification response: {:?}", response);
+                    // Handle notification click
+                    if matches!(response, NotificationResponse::Click) {
+                        let payload = NotificationClickPayload {
+                            task_type: task_type.clone(),
+                            task_id: task_id.clone(),
+                        };
+                        Self::emit_click_event(&app_handle, payload);
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to run osascript: {}", e);
+                    tracing::warn!("Failed to show macOS notification: {:?}", e);
                 }
             }
-
-            // For macOS, we'll need a different approach for click handling.
-            // The notification center doesn't provide a callback mechanism
-            // through osascript. We'd need to use:
-            // 1. A native Swift/Objective-C extension with
-            //    UNUserNotificationCenter
-            // 2. A deep link URL scheme that the app can handle
-            //
-            // For now, emit the event to indicate the notification was shown
-            // The frontend already has a handler but it won't be triggered
-            // until we implement proper native click handling.
-            //
-            // TODO: Implement proper macOS notification click handling using
-            // UNUserNotificationCenter with a notification delegate
         });
     }
 
