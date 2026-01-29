@@ -1,0 +1,298 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  CI: 1
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================
+  # Change Detection
+  # ============================================
+
+  changes:
+    name: Detect Changes
+    runs-on: [self-hosted, linux]
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          token: ''
+          filters: |
+            rust:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '**/*.rs'
+              - '.rustfmt.toml'
+              - 'rust-toolchain'
+              - '.github/workflows/CI.yml'
+            frontend:
+              - 'apps/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'turbo.json'
+
+  # ============================================
+  # Rust Jobs
+  # ============================================
+
+  rust-fmt:
+    name: Rust Format
+    runs-on: [self-hosted, linux]
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - run: |
+          rustup component add rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: [self-hosted, linux]
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Create frontend dist placeholder
+        run: mkdir -p apps/desktop/dist && echo "<html></html>" > apps/desktop/dist/index.html
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - run: |
+          rustup component add clippy
+
+      - name: Cache cargo
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  rust-test:
+    name: Rust Test
+    runs-on: [self-hosted, linux]
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Create frontend dist placeholder
+        run: mkdir -p apps/desktop/dist && echo "<html></html>" > apps/desktop/dist/index.html
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --all-features
+
+  # ============================================
+  # Frontend Jobs
+  # ============================================
+
+  frontend-typecheck:
+    name: Frontend TypeCheck
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check (desktop-app)
+        run: pnpm --filter desktop-app exec tsc --noEmit
+
+      - name: TypeScript check (webapp)
+        run: pnpm --filter webapp exec tsc --noEmit
+
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure environment variables
+        run: |
+          pnpm i -g vercel
+          pnpm run --parallel prepare:app
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          
+      - name: Build
+        run: pnpm build
+
+  # # ============================================
+  # # Full Build (Tauri)
+  # # ============================================
+
+  # tauri-build:
+  #   name: Tauri Build
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - platform: ubuntu-latest
+  #           target: x86_64-unknown-linux-gnu
+  #         - platform: macos-latest
+  #           target: aarch64-apple-darwin
+  #         - platform: windows-latest
+  #           target: x86_64-pc-windows-msvc
+  #   runs-on: ${{ matrix.platform }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Install Tauri dependencies (Linux)
+  #       if: matrix.platform == 'ubuntu-latest'
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y \
+  #           libwebkit2gtk-4.1-dev \
+  #           libappindicator3-dev \
+  #           librsvg2-dev \
+  #           patchelf
+
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v4
+
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "pnpm"
+
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: ${{ matrix.target }}
+
+  #     - name: Cache cargo
+  #       uses: Swatinem/rust-cache@v2
+
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile
+
+  #     - name: Build Tauri app
+  #       run: pnpm tauri build --target ${{ matrix.target }}
+  #       env:
+  #         TAURI_SIGNING_PRIVATE_KEY: ""
+  #         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+  # ============================================
+  # CI Done - Required Check
+  # ============================================
+  # Set this job as a required status check in GitHub settings
+  # to easily enforce all CI jobs pass before merging
+
+  ci-done:
+    name: CI Done
+    runs-on: [self-hosted, linux]
+    if: always()
+    needs:
+      - changes
+      - rust-fmt
+      - rust-clippy
+      - rust-test
+      - frontend-typecheck
+      - frontend-lint
+      - frontend-build
+      # - tauri-build
+    steps:
+      - name: Check all jobs passed
+        if: ${{ !contains(needs.*.result, 'failure') }}
+        run: echo "All CI jobs passed!"
+
+      - name: Some jobs failed
+        if: ${{ contains(needs.*.result, 'failure') }}
+        run: |
+          echo "One or more jobs failed"
+          exit 1

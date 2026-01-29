@@ -1,0 +1,94 @@
+name: Create Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Is this a prerelease?"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create and Push Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Error: Invalid version format. Expected: X.Y.Z or X.Y.Z-prerelease"
+            exit 1
+          fi
+
+      - name: Check if tag already exists
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Error: Tag v$VERSION already exists"
+            exit 1
+          fi
+
+      # - name: Update version in Cargo.toml
+      #   run: |
+      #     VERSION="${{ github.event.inputs.version }}"
+      #     sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' apps/desktop/src-tauri/Cargo.toml
+
+      - name: Update version in package.json
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          cd apps/desktop
+          npm version "$VERSION" --no-git-tag-version
+
+      - name: Update version in tauri.conf.json
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          cd apps/desktop/src-tauri
+          jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
+
+      - name: Commit version changes
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: bump version to $VERSION"
+          git push
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "## Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag URL:** ${{ github.server_url }}/${{ github.repository }}/releases/tag/v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release workflow will now build the app for all platforms." >> $GITHUB_STEP_SUMMARY

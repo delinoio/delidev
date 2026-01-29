@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CI: 1
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+
+  build-tauri:
+    name: Build (${{ matrix.platform }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            args: ""
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri dependencies (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm --filter desktop-app build
+
+      # Build with debug symbols first for Sentry (only if Sentry is configured)
+      - name: Build with debug symbols for Sentry
+        working-directory: apps/desktop/src-tauri
+        run: |
+          if [ "${{ matrix.target }}" != "" ]; then
+            cargo build --profile release-with-debug --target ${{ matrix.target }}
+          else
+            cargo build --profile release-with-debug
+          fi
+        shell: bash
+
+      # Install Sentry CLI and upload debug symbols
+      - name: Install Sentry CLI
+        run: npm install -g @sentry/cli
+
+      - name: Upload debug symbols to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        working-directory: apps/desktop/src-tauri
+        run: |
+          if [ "${{ matrix.target }}" != "" ]; then
+            sentry-cli debug-files upload --include-sources \
+              target/${{ matrix.target }}/release-with-debug/
+          else
+            sentry-cli debug-files upload --include-sources \
+              target/release-with-debug/
+          fi
+        shell: bash
+
+      # Build Tauri app (uses release profile with stripping configured in Cargo.toml)
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  publish-release:
+    name: Publish Release
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
