@@ -1060,6 +1060,20 @@ impl AgentExecutionService {
         // for review. The worktree will be cleaned up when the task is
         // approved/rejected.
 
+        // Extract and save token usage from the session
+        let model = agent_task.ai_agent_model.clone();
+        if let Err(e) = self
+            .task_service
+            .extract_and_save_session_usage(&session_id, model)
+            .await
+        {
+            tracing::warn!(
+                "Failed to extract session usage for task {}: {}",
+                task.id,
+                e
+            );
+        }
+
         tracing::info!("Task {} execution completed", task.id);
         Ok(())
     }
@@ -1541,6 +1555,20 @@ impl AgentExecutionService {
 
                 return Err(e);
             }
+        }
+
+        // Extract and save token usage from the session
+        let model = agent_task.ai_agent_model.clone();
+        if let Err(e) = self
+            .task_service
+            .extract_and_save_session_usage(&session_id, model)
+            .await
+        {
+            tracing::warn!(
+                "Failed to extract session usage for task {}: {}",
+                task.id,
+                e
+            );
         }
 
         tracing::info!("Task {} direct execution completed", task.id);

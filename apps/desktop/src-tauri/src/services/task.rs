@@ -1045,6 +1045,214 @@ impl TaskService {
         Ok(logs)
     }
 
+    // ========== Session Usage Operations ==========
+
+    /// Extracts token usage from stream messages and saves session usage
+    /// This should be called after a session completes to record the final token usage
+    pub async fn extract_and_save_session_usage(
+        &self,
+        session_id: &str,
+        model: Option<String>,
+    ) -> DatabaseResult<Option<crate::entities::SessionUsage>> {
+        // Get all stream messages for this session
+        let messages = self.get_stream_messages(session_id).await?;
+
+        // Find the Result message which contains the token usage
+        for entry in messages.iter().rev() {
+            // Check for Claude Code Result message
+            if let crate::entities::AgentStreamMessage::ClaudeCode(
+                crate::entities::ClaudeStreamMessage::Result {
+                    cost_usd,
+                    total_input_tokens,
+                    total_output_tokens,
+                    ..
+                },
+            ) = &entry.message
+            {
+                let input_tokens = total_input_tokens.unwrap_or(0);
+                let output_tokens = total_output_tokens.unwrap_or(0);
+
+                // Only save if we have any token data
+                if input_tokens > 0 || output_tokens > 0 || cost_usd.is_some() {
+                    let usage = crate::entities::SessionUsage::new(
+                        session_id.to_string(),
+                        input_tokens,
+                        output_tokens,
+                        *cost_usd,
+                        model,
+                    );
+
+                    self.save_session_usage(&usage).await?;
+                    tracing::info!(
+                        "Saved session usage for {}: {} input tokens, {} output tokens, cost: {:?}",
+                        session_id,
+                        input_tokens,
+                        output_tokens,
+                        cost_usd
+                    );
+                    return Ok(Some(usage));
+                }
+            }
+        }
+
+        tracing::debug!(
+            "No token usage found in stream messages for session {}",
+            session_id
+        );
+        Ok(None)
+    }
+
+    /// Saves session usage data to the database
+    pub async fn save_session_usage(
+        &self,
+        usage: &crate::entities::SessionUsage,
+    ) -> DatabaseResult<()> {
+        let created_at = usage.created_at.to_rfc3339();
+
+        sqlx::query(
+            "INSERT INTO session_usage (id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&usage.id)
+        .bind(&usage.session_id)
+        .bind(usage.input_tokens as i64)
+        .bind(usage.output_tokens as i64)
+        .bind(usage.total_tokens as i64)
+        .bind(usage.cost_usd)
+        .bind(&usage.model)
+        .bind(&created_at)
+        .execute(self.db.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    /// Gets session usage for a specific session
+    pub async fn get_session_usage(
+        &self,
+        session_id: &str,
+    ) -> DatabaseResult<Option<crate::entities::SessionUsage>> {
+        let row: Option<(String, String, i64, i64, i64, Option<f64>, Option<String>, String)> =
+            sqlx::query_as(
+                "SELECT id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at
+                 FROM session_usage
+                 WHERE session_id = ?",
+            )
+            .bind(session_id)
+            .fetch_optional(self.db.pool())
+            .await?;
+
+        match row {
+            Some((id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at_str)) => {
+                let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+                    .map_err(|e| crate::database::DatabaseError::Migration(e.to_string()))?
+                    .with_timezone(&chrono::Utc);
+
+                Ok(Some(crate::entities::SessionUsage {
+                    id,
+                    session_id,
+                    input_tokens: input_tokens as u64,
+                    output_tokens: output_tokens as u64,
+                    total_tokens: total_tokens as u64,
+                    cost_usd,
+                    model,
+                    created_at,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Gets aggregated usage summary for an agent task (all sessions combined)
+    pub async fn get_agent_task_usage_summary(
+        &self,
+        agent_task_id: &str,
+    ) -> DatabaseResult<crate::entities::TaskUsageSummary> {
+        // Use a single query with JOIN to get aggregated usage for all sessions of this agent task
+        let result: (i64, i64, i64, Option<f64>, i64) = sqlx::query_as(
+            "SELECT
+                COALESCE(SUM(su.input_tokens), 0) as total_input,
+                COALESCE(SUM(su.output_tokens), 0) as total_output,
+                COALESCE(SUM(su.total_tokens), 0) as total,
+                SUM(su.cost_usd) as total_cost,
+                COUNT(su.id) as session_count
+             FROM agent_sessions s
+             LEFT JOIN session_usage su ON s.id = su.session_id
+             WHERE s.agent_task_id = ?",
+        )
+        .bind(agent_task_id)
+        .fetch_one(self.db.pool())
+        .await
+        .unwrap_or((0, 0, 0, None, 0));
+
+        Ok(crate::entities::TaskUsageSummary {
+            total_input_tokens: result.0 as u64,
+            total_output_tokens: result.1 as u64,
+            total_tokens: result.2 as u64,
+            total_cost_usd: result.3.unwrap_or(0.0),
+            session_count: result.4 as u64,
+        })
+    }
+
+    /// Gets usage summary for a unit task (includes auto-fix tasks)
+    pub async fn get_unit_task_usage_summary(
+        &self,
+        unit_task_id: &str,
+    ) -> DatabaseResult<crate::entities::TaskUsageSummary> {
+        // Get the unit task to find the agent_task_id
+        let unit_task = self.get_unit_task(unit_task_id).await?;
+        let unit_task = unit_task.ok_or_else(|| {
+            crate::database::DatabaseError::NotFound(format!("Unit task {} not found", unit_task_id))
+        })?;
+
+        // Get usage for the main agent task
+        let mut summary = self.get_agent_task_usage_summary(&unit_task.agent_task_id).await?;
+
+        // Add usage from auto-fix tasks
+        for auto_fix_id in &unit_task.auto_fix_task_ids {
+            let auto_fix_summary = self.get_agent_task_usage_summary(auto_fix_id).await?;
+            summary.total_input_tokens += auto_fix_summary.total_input_tokens;
+            summary.total_output_tokens += auto_fix_summary.total_output_tokens;
+            summary.total_tokens += auto_fix_summary.total_tokens;
+            summary.total_cost_usd += auto_fix_summary.total_cost_usd;
+            summary.session_count += auto_fix_summary.session_count;
+        }
+
+        Ok(summary)
+    }
+
+    /// Gets usage summary for a composite task (all unit tasks combined)
+    pub async fn get_composite_task_usage_summary(
+        &self,
+        composite_task_id: &str,
+    ) -> DatabaseResult<crate::entities::TaskUsageSummary> {
+        // Get the composite task to find the planning task and all unit tasks
+        let composite_task = self.get_composite_task(composite_task_id).await?;
+        let composite_task = composite_task.ok_or_else(|| {
+            crate::database::DatabaseError::NotFound(format!(
+                "Composite task {} not found",
+                composite_task_id
+            ))
+        })?;
+
+        // Start with the planning task usage
+        let mut summary = self
+            .get_agent_task_usage_summary(&composite_task.planning_task_id)
+            .await?;
+
+        // Add usage from all unit tasks in the composite task
+        for node in &composite_task.nodes {
+            let unit_task_summary = self.get_unit_task_usage_summary(&node.unit_task_id).await?;
+            summary.total_input_tokens += unit_task_summary.total_input_tokens;
+            summary.total_output_tokens += unit_task_summary.total_output_tokens;
+            summary.total_tokens += unit_task_summary.total_tokens;
+            summary.total_cost_usd += unit_task_summary.total_cost_usd;
+            summary.session_count += unit_task_summary.session_count;
+        }
+
+        Ok(summary)
+    }
+
     /// Gets the set of blocked unit task IDs.
     /// A unit task is blocked if:
     /// - It belongs to a composite task that is in InProgress status

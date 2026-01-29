@@ -251,6 +251,39 @@ The system creates a workspace using git worktree before execution, then runs th
 | aiAgentType | AIAgentType | Y | Agent type |
 | aiAgentModel | string | N | Model to use (uses default if not specified) |
 
+### SessionUsage
+
+Token usage statistics for a single agent session.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Y | Unique identifier |
+| sessionId | string | Y | Associated AgentSession ID |
+| inputTokens | number | Y | Total input tokens used |
+| outputTokens | number | Y | Total output tokens used |
+| totalTokens | number | Y | Total tokens (input + output) |
+| costUsd | number | N | Cost in USD (if available from agent) |
+| model | string | N | Model used for the session |
+| createdAt | timestamp | Y | When the usage was recorded |
+
+Token usage is automatically extracted from agent stream messages when a session completes. For Claude Code, the usage data comes from the final `Result` message.
+
+### TaskUsageSummary
+
+Aggregated token usage across all sessions for a task.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| totalInputTokens | number | Y | Total input tokens across all sessions |
+| totalOutputTokens | number | Y | Total output tokens across all sessions |
+| totalTokens | number | Y | Total tokens (input + output) |
+| totalCostUsd | number | Y | Total cost in USD |
+| sessionCount | number | Y | Number of sessions included |
+
+This summary aggregates usage from:
+- **UnitTask**: Main agent task + all auto-fix retry tasks
+- **CompositeTask**: Planning task + all unit tasks in the plan
+
 ### AgentTask
 
 A collection of AgentSessions. The retryable unit.

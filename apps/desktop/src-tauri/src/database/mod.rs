@@ -428,6 +428,18 @@ CREATE TABLE IF NOT EXISTS agent_stream_messages (
     message_json TEXT NOT NULL
 );
 
+-- Session usage table for tracking token usage per session
+CREATE TABLE IF NOT EXISTS session_usage (
+    id TEXT PRIMARY KEY NOT NULL,
+    session_id TEXT NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL,
+    model TEXT,
+    created_at TEXT NOT NULL
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_unit_tasks_repository_group ON unit_tasks(repository_group_id);
 CREATE INDEX IF NOT EXISTS idx_unit_tasks_status ON unit_tasks(status);
@@ -441,4 +453,5 @@ CREATE INDEX IF NOT EXISTS idx_agent_stream_messages_session ON agent_stream_mes
 CREATE INDEX IF NOT EXISTS idx_repository_groups_workspace ON repository_groups(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_repository_group_members_group ON repository_group_members(repository_group_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_repositories_workspace ON workspace_repositories(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_session_usage_session ON session_usage(session_id);
 "#;

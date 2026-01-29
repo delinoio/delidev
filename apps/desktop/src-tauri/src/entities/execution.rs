@@ -209,6 +209,12 @@ pub enum ClaudeStreamMessage {
         session_id: Option<String>,
         #[serde(default)]
         parent_tool_use_id: Option<String>,
+        /// Total input tokens used in the session
+        #[serde(default)]
+        total_input_tokens: Option<u64>,
+        /// Total output tokens used in the session
+        #[serde(default)]
+        total_output_tokens: Option<u64>,
     },
 }
 
@@ -280,6 +286,64 @@ pub enum ContentBlock {
         #[serde(default)]
         is_error: Option<bool>,
     },
+}
+
+/// Token usage statistics for a session
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionUsage {
+    /// Unique identifier
+    pub id: String,
+    /// Agent session ID
+    pub session_id: String,
+    /// Total input tokens used
+    pub input_tokens: u64,
+    /// Total output tokens used
+    pub output_tokens: u64,
+    /// Total tokens (input + output)
+    pub total_tokens: u64,
+    /// Cost in USD (if available)
+    pub cost_usd: Option<f64>,
+    /// Model used for the session
+    pub model: Option<String>,
+    /// When the usage was recorded
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl SessionUsage {
+    /// Creates a new SessionUsage record
+    pub fn new(
+        session_id: String,
+        input_tokens: u64,
+        output_tokens: u64,
+        cost_usd: Option<f64>,
+        model: Option<String>,
+    ) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id,
+            input_tokens,
+            output_tokens,
+            total_tokens: input_tokens + output_tokens,
+            cost_usd,
+            model,
+            created_at: chrono::Utc::now(),
+        }
+    }
+}
+
+/// Aggregated token usage for a task (across all sessions)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TaskUsageSummary {
+    /// Total input tokens across all sessions
+    pub total_input_tokens: u64,
+    /// Total output tokens across all sessions
+    pub total_output_tokens: u64,
+    /// Total tokens (input + output)
+    pub total_tokens: u64,
+    /// Total cost in USD
+    pub total_cost_usd: f64,
+    /// Number of sessions included
+    pub session_count: u64,
 }
 
 #[cfg(test)]

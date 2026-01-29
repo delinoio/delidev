@@ -91,6 +91,10 @@ pub fn run() {
             commands::get_task_diff,
             commands::create_pr_for_task,
             commands::commit_to_repository,
+            // Token usage commands
+            commands::get_session_usage,
+            commands::get_unit_task_usage,
+            commands::get_composite_task_usage,
             // Composite task planning commands
             commands::start_composite_task_planning,
             commands::get_composite_task_plan,

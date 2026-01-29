@@ -2578,6 +2578,55 @@ pub async fn execute_composite_task_nodes(
     Ok(started_task_ids)
 }
 
+// ========== Token Usage Commands ==========
+
+/// Gets token usage for a specific session
+#[tauri::command]
+pub async fn get_session_usage(
+    state: State<'_, Arc<AppState>>,
+    session_id: String,
+) -> Result<Option<crate::entities::SessionUsage>, String> {
+    state
+        .task_service
+        .get_session_usage(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets aggregated token usage summary for a unit task (includes all sessions
+/// and auto-fix attempts)
+#[tauri::command]
+pub async fn get_unit_task_usage(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<crate::entities::TaskUsageSummary, String> {
+    // Validate task_id to prevent path traversal
+    validate_task_id(&task_id)?;
+
+    state
+        .task_service
+        .get_unit_task_usage_summary(&task_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets aggregated token usage summary for a composite task (includes planning
+/// task and all unit tasks)
+#[tauri::command]
+pub async fn get_composite_task_usage(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<crate::entities::TaskUsageSummary, String> {
+    // Validate task_id to prevent path traversal
+    validate_task_id(&task_id)?;
+
+    state
+        .task_service
+        .get_composite_task_usage_summary(&task_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
