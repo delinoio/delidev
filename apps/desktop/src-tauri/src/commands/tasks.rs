@@ -2753,6 +2753,52 @@ pub struct GeneratedTaskInfo {
     pub branch_name: String,
 }
 
+/// Token usage information
+#[derive(serde::Serialize)]
+pub struct TokenUsage {
+    /// Total cost in USD
+    pub total_cost_usd: Option<f64>,
+    /// Total duration in milliseconds
+    pub total_duration_ms: Option<f64>,
+}
+
+/// Gets token usage for a unit task (includes main task and all auto-fix tasks)
+#[tauri::command]
+pub async fn get_unit_task_token_usage(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<TokenUsage, String> {
+    let (total_cost_usd, total_duration_ms) = state
+        .task_service
+        .get_unit_task_token_usage(&task_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(TokenUsage {
+        total_cost_usd,
+        total_duration_ms,
+    })
+}
+
+/// Gets token usage for a composite task (includes planning task and all unit
+/// tasks)
+#[tauri::command]
+pub async fn get_composite_task_token_usage(
+    state: State<'_, Arc<AppState>>,
+    task_id: String,
+) -> Result<TokenUsage, String> {
+    let (total_cost_usd, total_duration_ms) = state
+        .task_service
+        .get_composite_task_token_usage(&task_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(TokenUsage {
+        total_cost_usd,
+        total_duration_ms,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

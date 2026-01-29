@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { CompositeTaskStatus, UnitTaskStatus, type CompositeTask, type AgentTask, type UnitTask } from "../types";
 import * as api from "../api";
-import type { ExecutionLog } from "../api";
+import type { ExecutionLog, TokenUsage } from "../api";
 import { StreamRenderer, type StreamEntry } from "../components/execution";
 import { TaskGraphVisualization } from "../components/graph";
 import { useTabsStore } from "../stores/tabs";
@@ -96,6 +96,9 @@ export function CompositeTaskDetail() {
   const [planYamlContent, setPlanYamlContent] = useState<string | null>(null);
   const [isPlanLoading, setIsPlanLoading] = useState(false);
   const [planYamlParseError, setPlanYamlParseError] = useState<string | null>(null);
+
+  // Token usage state
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   // Unit task statuses for the graph visualization
   const [unitTaskStatuses, setUnitTaskStatuses] = useState<Record<string, UnitTaskStatus>>({});
@@ -260,6 +263,15 @@ export function CompositeTaskDetail() {
           } catch (err) {
             console.error("Failed to load unit tasks:", err);
           }
+        }
+
+        // Fetch token usage
+        try {
+          const usage = await api.getCompositeTaskTokenUsage(taskId);
+          setTokenUsage(usage);
+        } catch (err) {
+          console.error("Failed to load token usage:", err);
+          // Don't fail the whole page if token usage loading fails
         }
       } else {
         setError("Task not found");
@@ -578,6 +590,25 @@ export function CompositeTaskDetail() {
                 {new Date(task.created_at).toLocaleString()}
               </p>
             </div>
+            {tokenUsage && (tokenUsage.total_cost_usd !== null || tokenUsage.total_duration_ms !== null) && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Token Usage (Total)
+                </p>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {tokenUsage.total_cost_usd !== null && (
+                    <span>
+                      Cost: <span className="font-medium">${tokenUsage.total_cost_usd.toFixed(4)}</span>
+                    </span>
+                  )}
+                  {tokenUsage.total_duration_ms !== null && (
+                    <span>
+                      Duration: <span className="font-medium">{(tokenUsage.total_duration_ms / 1000).toFixed(1)}s</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

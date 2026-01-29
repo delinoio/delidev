@@ -758,8 +758,8 @@ impl TaskService {
 
                 // Get sessions
                 let session_rows: Vec<AgentSessionRow> = sqlx::query_as(
-                    "SELECT id, agent_task_id, ai_agent_type, ai_agent_model, created_at FROM \
-                     agent_sessions WHERE agent_task_id = ?",
+                    "SELECT id, agent_task_id, ai_agent_type, ai_agent_model, created_at, \
+                     total_cost_usd, total_duration_ms FROM agent_sessions WHERE agent_task_id = ?",
                 )
                 .bind(id)
                 .fetch_all(self.db.pool())
@@ -1102,5 +1102,133 @@ impl TaskService {
         }
 
         Ok(blocked_ids)
+    }
+
+    // ========== Token Usage Operations ==========
+
+    /// Aggregates token usage from stream messages for a session and updates
+    /// the session record
+    pub async fn aggregate_and_update_session_token_usage(
+        &self,
+        session_id: &str,
+    ) -> DatabaseResult<(Option<f64>, Option<f64>)> {
+        // Get all stream messages for this session
+        let messages = self.get_stream_messages(session_id).await?;
+
+        // Aggregate cost_usd and duration_ms from all Result messages
+        let mut total_cost_usd: Option<f64> = None;
+        let mut total_duration_ms: Option<f64> = None;
+
+        for entry in messages {
+            if let crate::entities::AgentStreamMessage::ClaudeCode(
+                crate::entities::ClaudeStreamMessage::Result {
+                    cost_usd,
+                    duration_ms,
+                    ..
+                },
+            ) = entry.message
+            {
+                if let Some(cost) = cost_usd {
+                    total_cost_usd = Some(total_cost_usd.unwrap_or(0.0) + cost);
+                }
+                if let Some(duration) = duration_ms {
+                    total_duration_ms = Some(total_duration_ms.unwrap_or(0.0) + duration);
+                }
+            }
+        }
+
+        // Update the session record with aggregated values
+        if total_cost_usd.is_some() || total_duration_ms.is_some() {
+            sqlx::query(
+                "UPDATE agent_sessions SET total_cost_usd = ?, total_duration_ms = ? WHERE id = ?",
+            )
+            .bind(total_cost_usd)
+            .bind(total_duration_ms)
+            .bind(session_id)
+            .execute(self.db.pool())
+            .await?;
+        }
+
+        Ok((total_cost_usd, total_duration_ms))
+    }
+
+    /// Gets aggregated token usage for all sessions in an agent task
+    pub async fn get_agent_task_token_usage(
+        &self,
+        agent_task_id: &str,
+    ) -> DatabaseResult<(Option<f64>, Option<f64>)> {
+        let row: (Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT SUM(total_cost_usd), SUM(total_duration_ms) FROM agent_sessions WHERE \
+             agent_task_id = ?",
+        )
+        .bind(agent_task_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Gets aggregated token usage for a unit task (includes main task and all
+    /// auto-fix tasks)
+    pub async fn get_unit_task_token_usage(
+        &self,
+        unit_task_id: &str,
+    ) -> DatabaseResult<(Option<f64>, Option<f64>)> {
+        // Query that sums token usage from:
+        // 1. The main agent_task linked to the unit task
+        // 2. All auto-fix agent tasks
+        let row: (Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT SUM(total_cost_usd), SUM(total_duration_ms)
+             FROM agent_sessions
+             WHERE agent_task_id IN (
+                 SELECT agent_task_id FROM unit_tasks WHERE id = ?
+                 UNION
+                 SELECT agent_task_id FROM unit_task_auto_fixes WHERE unit_task_id = ?
+             )",
+        )
+        .bind(unit_task_id)
+        .bind(unit_task_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Gets aggregated token usage for a composite task (includes planning task
+    /// and all unit tasks)
+    pub async fn get_composite_task_token_usage(
+        &self,
+        composite_task_id: &str,
+    ) -> DatabaseResult<(Option<f64>, Option<f64>)> {
+        // Query that sums token usage from:
+        // 1. The planning agent_task
+        // 2. All unit tasks' agent sessions (via composite_task_nodes)
+        let row: (Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT SUM(total_cost_usd), SUM(total_duration_ms)
+             FROM agent_sessions
+             WHERE agent_task_id IN (
+                 -- Planning task
+                 SELECT planning_task_id FROM composite_tasks WHERE id = ?
+                 UNION
+                 -- All unit tasks in the composite task
+                 SELECT ut.agent_task_id
+                 FROM composite_task_nodes ctn
+                 JOIN unit_tasks ut ON ctn.unit_task_id = ut.id
+                 WHERE ctn.composite_task_id = ?
+                 UNION
+                 -- All auto-fix tasks for unit tasks in the composite task
+                 SELECT uaf.agent_task_id
+                 FROM composite_task_nodes ctn
+                 JOIN unit_task_auto_fixes uaf ON ctn.unit_task_id = uaf.unit_task_id
+                 WHERE ctn.composite_task_id = ?
+             )",
+        )
+        .bind(composite_task_id)
+        .bind(composite_task_id)
+        .bind(composite_task_id)
+        .fetch_one(self.db.pool())
+        .await?;
+
+        Ok(row)
     }
 }

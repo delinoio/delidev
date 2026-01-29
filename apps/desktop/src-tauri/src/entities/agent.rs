@@ -49,6 +49,13 @@ pub struct AgentSession {
     pub ai_agent_type: AIAgentType,
     /// Model to use (uses default if not specified)
     pub ai_agent_model: Option<String>,
+    /// Total cost in USD for this session (aggregated from result messages)
+    #[serde(default)]
+    pub total_cost_usd: Option<f64>,
+    /// Total duration in milliseconds for this session (aggregated from result
+    /// messages)
+    #[serde(default)]
+    pub total_duration_ms: Option<f64>,
 }
 
 impl AgentSession {
@@ -57,11 +64,19 @@ impl AgentSession {
             id,
             ai_agent_type,
             ai_agent_model: None,
+            total_cost_usd: None,
+            total_duration_ms: None,
         }
     }
 
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.ai_agent_model = Some(model.into());
+        self
+    }
+
+    pub fn with_token_usage(mut self, cost_usd: Option<f64>, duration_ms: Option<f64>) -> Self {
+        self.total_cost_usd = cost_usd;
+        self.total_duration_ms = duration_ms;
         self
     }
 

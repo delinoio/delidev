@@ -47,7 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import type { ExecutionLog, ClaudeStreamEvent, TtyInputRequest } from "../api";
+import type { ExecutionLog, ClaudeStreamEvent, TtyInputRequest, TokenUsage } from "../api";
 import { StreamRenderer, type StreamEntry, TtyInputDialog } from "../components/execution";
 import { DiffViewer, ReviewSubmitDialog } from "../components/diff";
 import { RequestChangesDialog } from "../components/tasks";
@@ -137,6 +137,9 @@ export function UnitTaskDetail() {
   const [isEditingBranch, setIsEditingBranch] = useState(false);
   const [editedBranchName, setEditedBranchName] = useState("");
   const [isRenamingBranch, setIsRenamingBranch] = useState(false);
+
+  // Token usage state
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   // Review store
   const { getAllComments, getViewedFilesCount, clearTaskReview } = useReviewStore();
@@ -373,6 +376,15 @@ export function UnitTaskDetail() {
         } catch (err) {
           console.error("Failed to load agent task:", err);
           // Don't fail the whole page if agent task loading fails
+        }
+
+        // Fetch token usage
+        try {
+          const usage = await api.getUnitTaskTokenUsage(taskId);
+          setTokenUsage(usage);
+        } catch (err) {
+          console.error("Failed to load token usage:", err);
+          // Don't fail the whole page if token usage loading fails
         }
 
         // Check if the task is currently executing (e.g., after page refresh)
@@ -939,6 +951,25 @@ export function UnitTaskDetail() {
                 {new Date(task.created_at).toLocaleString()}
               </p>
             </div>
+            {tokenUsage && (tokenUsage.total_cost_usd !== null || tokenUsage.total_duration_ms !== null) && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Token Usage
+                </p>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {tokenUsage.total_cost_usd !== null && (
+                    <span>
+                      Cost: <span className="font-medium">${tokenUsage.total_cost_usd.toFixed(4)}</span>
+                    </span>
+                  )}
+                  {tokenUsage.total_duration_ms !== null && (
+                    <span>
+                      Duration: <span className="font-medium">{(tokenUsage.total_duration_ms / 1000).toFixed(1)}s</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

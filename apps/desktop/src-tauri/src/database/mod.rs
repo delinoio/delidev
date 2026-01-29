@@ -92,6 +92,15 @@ impl Database {
         // support
         self.migrate_to_repository_groups().await?;
 
+        // Migration: Add token usage columns to agent_sessions if they don't exist
+        let _ = sqlx::query("ALTER TABLE agent_sessions ADD COLUMN total_cost_usd REAL")
+            .execute(&self.pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE agent_sessions ADD COLUMN total_duration_ms REAL")
+            .execute(&self.pool)
+            .await;
+        // Ignore errors if columns already exist
+
         Ok(())
     }
 
@@ -332,7 +341,9 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     agent_task_id TEXT NOT NULL REFERENCES agent_tasks(id) ON DELETE CASCADE,
     ai_agent_type TEXT NOT NULL,
     ai_agent_model TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    total_cost_usd REAL,
+    total_duration_ms REAL
 );
 
 -- Unit tasks table

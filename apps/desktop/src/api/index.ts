@@ -517,6 +517,32 @@ export async function commitToRepository(
   return invoke("commit_to_repository", { taskId, mergeStrategy });
 }
 
+// ========== Token Usage API ==========
+
+/**
+ * Token usage information for a task
+ */
+export interface TokenUsage {
+  /** Total cost in USD */
+  total_cost_usd: number | null;
+  /** Total duration in milliseconds */
+  total_duration_ms: number | null;
+}
+
+/**
+ * Gets token usage for a unit task (includes main task and all auto-fix tasks)
+ */
+export async function getUnitTaskTokenUsage(taskId: string): Promise<TokenUsage> {
+  return invoke("get_unit_task_token_usage", { taskId });
+}
+
+/**
+ * Gets token usage for a composite task (includes planning task and all unit tasks)
+ */
+export async function getCompositeTaskTokenUsage(taskId: string): Promise<TokenUsage> {
+  return invoke("get_composite_task_token_usage", { taskId });
+}
+
 // ========== Claude Stream Types ==========
 
 export type ClaudeStreamMessageType = "system" | "assistant" | "user" | "result";

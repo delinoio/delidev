@@ -266,6 +266,8 @@ pub struct AgentSessionRow {
     pub ai_agent_type: String,
     pub ai_agent_model: Option<String>,
     pub created_at: String,
+    pub total_cost_usd: Option<f64>,
+    pub total_duration_ms: Option<f64>,
 }
 
 impl From<AgentSessionRow> for AgentSession {
@@ -280,6 +282,8 @@ impl From<AgentSessionRow> for AgentSession {
             id: row.id,
             ai_agent_type,
             ai_agent_model: row.ai_agent_model,
+            total_cost_usd: row.total_cost_usd,
+            total_duration_ms: row.total_duration_ms,
         }
     }
 }

@@ -812,6 +812,19 @@ impl AgentExecutionService {
                         "Execution completed successfully",
                     );
 
+                    // Aggregate and store token usage from stream messages
+                    if let Err(e) = self
+                        .task_service
+                        .aggregate_and_update_session_token_usage(&session_id)
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to aggregate token usage for session {}: {}",
+                            session_id,
+                            e
+                        );
+                    }
+
                     // Capture the end commit hash after successful execution
                     // This allows accurate diff display showing only this task's changes
                     let end_commit = match self.git_service.get_worktree_head_commit(&worktree_path)
@@ -1350,6 +1363,19 @@ impl AgentExecutionService {
                         ExecutionPhase::Completed,
                         "Execution completed successfully",
                     );
+
+                    // Aggregate and store token usage from stream messages
+                    if let Err(e) = self
+                        .task_service
+                        .aggregate_and_update_session_token_usage(&session_id)
+                        .await
+                    {
+                        tracing::warn!(
+                            "Failed to aggregate token usage for session {}: {}",
+                            session_id,
+                            e
+                        );
+                    }
 
                     // Capture the end commit hash
                     let end_commit = match self.git_service.get_worktree_head_commit(&worktree_path)
@@ -2013,6 +2039,19 @@ After addressing the feedback:
                     ExecutionPhase::Completed,
                     "Agent task completed successfully",
                 );
+
+                // Aggregate and store token usage from stream messages
+                if let Err(e) = self
+                    .task_service
+                    .aggregate_and_update_session_token_usage(&session_id)
+                    .await
+                {
+                    tracing::warn!(
+                        "Failed to aggregate token usage for session {}: {}",
+                        session_id,
+                        e
+                    );
+                }
 
                 Ok(AgentTaskExecutionResult {
                     success: true,
