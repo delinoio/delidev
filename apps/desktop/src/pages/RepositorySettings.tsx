@@ -16,8 +16,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Loader2, Save, Check, ArrowLeft } from "lucide-react";
-import { AutoFixReviewFilter, LicenseStatus, type LicenseInfo, type RepositoryConfig } from "../types";
-import { PremiumBadge } from "../components/ui/premium-badge";
+import { AutoFixReviewFilter, type RepositoryConfig } from "../types";
 
 const autoFixFilterOptions = [
   { value: AutoFixReviewFilter.WriteAccessOnly, label: "Write Access Only" },
@@ -33,14 +32,11 @@ export function RepositorySettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
 
   const repository = repositories.find((r) => r.id === id);
 
   useEffect(() => {
     fetchRepositories();
-    // Fetch license info
-    api.getLicenseInfo().then(setLicenseInfo).catch(console.error);
   }, [fetchRepositories]);
 
   useEffect(() => {
@@ -280,10 +276,7 @@ export function RepositorySettings() {
           {/* Learning Settings (Override) */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Learning (Override)
-                <PremiumBadge />
-              </CardTitle>
+              <CardTitle>Learning (Override)</CardTitle>
               <CardDescription>
                 Override global learning settings for this repository.
               </CardDescription>
@@ -304,7 +297,6 @@ export function RepositorySettings() {
                         undefined
                       )
                     }
-                    disabled={licenseInfo?.status !== LicenseStatus.Active}
                     className="h-4 w-4"
                   />
                   <Label htmlFor="learning-global">Use global setting</Label>
@@ -320,7 +312,6 @@ export function RepositorySettings() {
                     onChange={() =>
                       updateConfig(["learning", "auto_learn_from_reviews"], true)
                     }
-                    disabled={licenseInfo?.status !== LicenseStatus.Active}
                     className="h-4 w-4"
                   />
                   <Label htmlFor="learning-on">Override: On</Label>
@@ -339,7 +330,6 @@ export function RepositorySettings() {
                         false
                       )
                     }
-                    disabled={licenseInfo?.status !== LicenseStatus.Active}
                     className="h-4 w-4"
                   />
                   <Label htmlFor="learning-off">Override: Off</Label>

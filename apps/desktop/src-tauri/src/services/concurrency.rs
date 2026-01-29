@@ -5,7 +5,6 @@ use std::{
 
 use tokio::sync::{mpsc, RwLock};
 
-use super::LicenseService;
 use crate::entities::ConcurrencyConfig;
 
 /// Error types for concurrency operations
@@ -15,8 +14,6 @@ pub enum ConcurrencyError {
     /// The task has been queued for automatic execution when a slot becomes
     /// available.
     LimitReached { current: u32, limit: u32 },
-    /// Feature requires a valid license
-    LicenseRequired,
 }
 
 /// A pending task that couldn't be started due to concurrency limits.
@@ -85,21 +82,19 @@ impl std::fmt::Display for ConcurrencyError {
                     current, limit
                 )
             }
-            ConcurrencyError::LicenseRequired => {
-                write!(
-                    f,
-                    "Concurrency limits are a premium feature. Please activate a license to use \
-                     this feature."
-                )
-            }
         }
     }
 }
 
 impl std::error::Error for ConcurrencyError {}
 
+impl Default for ConcurrencyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Service for managing concurrent agent session limits.
-/// This is a premium feature that requires a valid license.
 ///
 /// When a task cannot be started due to concurrency limits, it is added to
 /// a pending queue. When a running task completes, the service automatically
@@ -110,8 +105,6 @@ pub struct ConcurrencyService {
     running_tasks: Arc<RwLock<HashSet<String>>>,
     /// Queue of pending task IDs (FIFO order)
     pending_tasks: Arc<RwLock<VecDeque<PendingTask>>>,
-    /// License service for checking premium feature access
-    license_service: Arc<LicenseService>,
     /// Channel sender to notify when a slot becomes available
     /// The receiver should attempt to execute the pending task
     slot_available_tx: Arc<RwLock<Option<mpsc::UnboundedSender<PendingTask>>>>,
@@ -119,11 +112,10 @@ pub struct ConcurrencyService {
 
 impl ConcurrencyService {
     /// Creates a new ConcurrencyService
-    pub fn new(license_service: Arc<LicenseService>) -> Self {
+    pub fn new() -> Self {
         Self {
             running_tasks: Arc::new(RwLock::new(HashSet::new())),
             pending_tasks: Arc::new(RwLock::new(VecDeque::new())),
-            license_service,
             slot_available_tx: Arc::new(RwLock::new(None)),
         }
     }
@@ -179,8 +171,7 @@ impl ConcurrencyService {
     ///
     /// This function validates:
     /// 1. If max_concurrent_sessions is None (unlimited), always allows
-    /// 2. If max_concurrent_sessions is set, requires a valid license
-    /// 3. If license is valid, checks current count against limit
+    /// 2. If max_concurrent_sessions is set, checks current count against limit
     ///
     /// This method is atomic - it holds the write lock during both the check
     /// and insert, preventing race conditions where multiple tasks could
@@ -205,11 +196,6 @@ impl ConcurrencyService {
                 return Ok(TaskGuard::new(task_id.to_string(), Arc::clone(self)));
             }
         };
-
-        // Concurrency limits require a valid license
-        if !self.license_service.is_license_valid().await {
-            return Err(ConcurrencyError::LicenseRequired);
-        }
 
         // Atomically check and register while holding the write lock
         let mut running = self.running_tasks.write().await;
@@ -248,11 +234,6 @@ impl ConcurrencyService {
             Some(limit) => limit,
             None => return Ok(()),
         };
-
-        // Concurrency limits require a valid license
-        if !self.license_service.is_license_valid().await {
-            return Err(ConcurrencyError::LicenseRequired);
-        }
 
         // Check current count against limit
         let running = self.running_tasks.read().await;
@@ -367,19 +348,9 @@ impl ConcurrencyService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ConfigManager;
-
-    fn create_test_license_service() -> Arc<LicenseService> {
-        // Create a mock config manager for testing
-        // In reality, we'd need to properly mock this
-        let config_manager =
-            Arc::new(ConfigManager::new().expect("Failed to create config manager for test"));
-        Arc::new(LicenseService::new(config_manager))
-    }
 
     fn create_test_service() -> Arc<ConcurrencyService> {
-        let license_service = create_test_license_service();
-        Arc::new(ConcurrencyService::new(license_service))
+        Arc::new(ConcurrencyService::new())
     }
 
     #[tokio::test]
@@ -434,8 +405,7 @@ mod tests {
     #[tokio::test]
     #[allow(deprecated)]
     async fn test_unlimited_concurrency() {
-        let license_service = create_test_license_service();
-        let service = ConcurrencyService::new(license_service);
+        let service = ConcurrencyService::new();
 
         let config = ConcurrencyConfig {
             max_concurrent_sessions: None,
@@ -456,8 +426,7 @@ mod tests {
     #[tokio::test]
     #[allow(deprecated)]
     async fn test_register_and_unregister() {
-        let license_service = create_test_license_service();
-        let service = ConcurrencyService::new(license_service);
+        let service = ConcurrencyService::new();
 
         assert_eq!(service.running_count().await, 0);
 
@@ -477,8 +446,7 @@ mod tests {
     #[tokio::test]
     #[allow(deprecated)]
     async fn test_clear() {
-        let license_service = create_test_license_service();
-        let service = ConcurrencyService::new(license_service);
+        let service = ConcurrencyService::new();
 
         service.register_task("task1").await;
         service.register_task("task2").await;
@@ -491,8 +459,7 @@ mod tests {
     #[tokio::test]
     #[allow(deprecated)]
     async fn test_running_tasks() {
-        let license_service = create_test_license_service();
-        let service = ConcurrencyService::new(license_service);
+        let service = ConcurrencyService::new();
 
         service.register_task("task1").await;
         service.register_task("task2").await;

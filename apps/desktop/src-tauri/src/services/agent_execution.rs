@@ -291,23 +291,8 @@ impl AgentExecutionService {
     }
 
     /// Checks if auto-learning is enabled for the given repository path.
-    /// Auto-learning requires a valid license. If no valid license is present,
-    /// this returns false regardless of user settings.
     async fn is_auto_learn_enabled(&self, repo_path: &std::path::Path) -> bool {
-        // Check license status - auto-learning requires a valid license
-        let has_valid_license = if let Ok(cm) = crate::config::ConfigManager::new() {
-            let license_service = super::LicenseService::new(std::sync::Arc::new(cm));
-            license_service.is_license_valid().await
-        } else {
-            false
-        };
-
-        if !has_valid_license {
-            // No valid license, auto-learning is disabled
-            return false;
-        }
-
-        // License is valid, check user's config settings
+        // Check user's config settings
         let config_manager = crate::config::ConfigManager::new().ok();
         let global_config = config_manager
             .as_ref()
@@ -2439,14 +2424,6 @@ After addressing the feedback:
                                 unit_task.id,
                                 current,
                                 limit
-                            );
-                            continue;
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Cannot start dependent task {} due to concurrency error: {}",
-                                unit_task.id,
-                                e
                             );
                             continue;
                         }
