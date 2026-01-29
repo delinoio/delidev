@@ -76,6 +76,76 @@ pub struct VCSIssue {
     pub labels: Vec<String>,
 }
 
+/// CI check status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CICheckStatus {
+    /// Check is still running
+    Pending,
+    /// Check passed
+    Success,
+    /// Check failed
+    Failure,
+    /// Check was neutral (skipped or informational)
+    Neutral,
+}
+
+/// CI check run info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CICheckRun {
+    pub id: u64,
+    pub name: String,
+    pub status: CICheckStatus,
+    pub conclusion: Option<String>,
+    pub details_url: Option<String>,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+/// Combined CI status for a PR
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CIStatus {
+    pub overall_status: CICheckStatus,
+    pub check_runs: Vec<CICheckRun>,
+    pub total_count: usize,
+    pub pending_count: usize,
+    pub success_count: usize,
+    pub failure_count: usize,
+}
+
+/// Review comment info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VCSReviewComment {
+    pub id: u64,
+    pub body: String,
+    pub author: String,
+    pub path: Option<String>,
+    pub line: Option<u64>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// PR review info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VCSReview {
+    pub id: u64,
+    pub author: String,
+    pub state: String,
+    pub body: Option<String>,
+    pub submitted_at: Option<String>,
+    pub comments: Vec<VCSReviewComment>,
+}
+
+/// User permission level
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UserPermission {
+    Admin,
+    Write,
+    Read,
+    None,
+}
+
 /// Service for interacting with VCS providers
 pub struct VCSProviderService {
     client: Client,
@@ -321,6 +391,356 @@ impl VCSProviderService {
             .collect())
     }
 
+    /// Gets CI check status for a PR on GitHub
+    /// Uses the combined check runs endpoint to get all CI checks
+    pub async fn get_github_pr_checks(
+        &self,
+        creds: &GitHubCredentials,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> VCSResult<CIStatus> {
+        // First get the PR to find the head SHA
+        let pr_url = format!(
+            "https://api.github.com/repos/{}/{}/pulls/{}",
+            owner, repo, pr_number
+        );
+
+        let pr_response = self
+            .client
+            .get(&pr_url)
+            .header("Authorization", format!("Bearer {}", creds.token))
+            .header("User-Agent", "delidev")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(VCSError::Http)?;
+
+        let status = pr_response.status();
+
+        if status == 401 {
+            return Err(VCSError::AuthFailed);
+        }
+
+        if status == 404 {
+            return Err(VCSError::NotFound(format!(
+                "{}/{}/pull/{}",
+                owner, repo, pr_number
+            )));
+        }
+
+        if !status.is_success() {
+            let body = pr_response.text().await.unwrap_or_default();
+            return Err(VCSError::ApiError(format!(
+                "GitHub API returned status {}: {}",
+                status,
+                sanitize_api_error(&body)
+            )));
+        }
+
+        let pr: GitHubPRDetail = pr_response.json().await.map_err(|e| {
+            VCSError::ParseError(format!("Failed to parse GitHub PR response: {}", e))
+        })?;
+
+        let head_sha = pr.head.sha;
+
+        // Now get the check runs for this commit
+        let checks_url = format!(
+            "https://api.github.com/repos/{}/{}/commits/{}/check-runs",
+            owner, repo, head_sha
+        );
+
+        let checks_response = self
+            .client
+            .get(&checks_url)
+            .header("Authorization", format!("Bearer {}", creds.token))
+            .header("User-Agent", "delidev")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(VCSError::Http)?;
+
+        let status = checks_response.status();
+
+        if !status.is_success() {
+            let body = checks_response.text().await.unwrap_or_default();
+            return Err(VCSError::ApiError(format!(
+                "GitHub API returned status {}: {}",
+                status,
+                sanitize_api_error(&body)
+            )));
+        }
+
+        let checks: GitHubCheckRunsResponse = checks_response.json().await.map_err(|e| {
+            VCSError::ParseError(format!("Failed to parse GitHub check runs response: {}", e))
+        })?;
+
+        let mut check_runs = Vec::new();
+        let mut pending_count = 0;
+        let mut success_count = 0;
+        let mut failure_count = 0;
+
+        for run in checks.check_runs {
+            let check_status = match (run.status.as_str(), run.conclusion.as_deref()) {
+                ("completed", Some("success")) => {
+                    success_count += 1;
+                    CICheckStatus::Success
+                }
+                ("completed", Some("failure")) | ("completed", Some("timed_out")) => {
+                    failure_count += 1;
+                    CICheckStatus::Failure
+                }
+                ("completed", Some("neutral")) | ("completed", Some("skipped")) => {
+                    CICheckStatus::Neutral
+                }
+                _ => {
+                    pending_count += 1;
+                    CICheckStatus::Pending
+                }
+            };
+
+            check_runs.push(CICheckRun {
+                id: run.id,
+                name: run.name,
+                status: check_status,
+                conclusion: run.conclusion,
+                details_url: run.details_url,
+                started_at: run.started_at,
+                completed_at: run.completed_at,
+            });
+        }
+
+        let total_count = check_runs.len();
+        let overall_status = if failure_count > 0 {
+            CICheckStatus::Failure
+        } else if pending_count > 0 {
+            CICheckStatus::Pending
+        } else if success_count > 0 {
+            CICheckStatus::Success
+        } else {
+            CICheckStatus::Neutral
+        };
+
+        Ok(CIStatus {
+            overall_status,
+            check_runs,
+            total_count,
+            pending_count,
+            success_count,
+            failure_count,
+        })
+    }
+
+    /// Gets reviews and review comments for a PR on GitHub
+    pub async fn get_github_pr_reviews(
+        &self,
+        creds: &GitHubCredentials,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> VCSResult<Vec<VCSReview>> {
+        // Get reviews
+        let reviews_url = format!(
+            "https://api.github.com/repos/{}/{}/pulls/{}/reviews",
+            owner, repo, pr_number
+        );
+
+        let reviews_response = self
+            .client
+            .get(&reviews_url)
+            .header("Authorization", format!("Bearer {}", creds.token))
+            .header("User-Agent", "delidev")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(VCSError::Http)?;
+
+        let status = reviews_response.status();
+
+        if status == 401 {
+            return Err(VCSError::AuthFailed);
+        }
+
+        if status == 404 {
+            return Err(VCSError::NotFound(format!(
+                "{}/{}/pull/{}",
+                owner, repo, pr_number
+            )));
+        }
+
+        if !status.is_success() {
+            let body = reviews_response.text().await.unwrap_or_default();
+            return Err(VCSError::ApiError(format!(
+                "GitHub API returned status {}: {}",
+                status,
+                sanitize_api_error(&body)
+            )));
+        }
+
+        let reviews: Vec<GitHubReview> = reviews_response.json().await.map_err(|e| {
+            VCSError::ParseError(format!("Failed to parse GitHub reviews response: {}", e))
+        })?;
+
+        // Get review comments (inline comments on the diff)
+        let comments_url = format!(
+            "https://api.github.com/repos/{}/{}/pulls/{}/comments",
+            owner, repo, pr_number
+        );
+
+        let comments_response = self
+            .client
+            .get(&comments_url)
+            .header("Authorization", format!("Bearer {}", creds.token))
+            .header("User-Agent", "delidev")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(VCSError::Http)?;
+
+        let status = comments_response.status();
+
+        if !status.is_success() {
+            let body = comments_response.text().await.unwrap_or_default();
+            return Err(VCSError::ApiError(format!(
+                "GitHub API returned status {}: {}",
+                status,
+                sanitize_api_error(&body)
+            )));
+        }
+
+        let comments: Vec<GitHubReviewComment> = comments_response.json().await.map_err(|e| {
+            VCSError::ParseError(format!("Failed to parse GitHub review comments: {}", e))
+        })?;
+
+        // Group comments by review_id
+        let mut comments_by_review: std::collections::HashMap<u64, Vec<VCSReviewComment>> =
+            std::collections::HashMap::new();
+        let mut orphan_comments: Vec<VCSReviewComment> = Vec::new();
+
+        for comment in comments {
+            let vcs_comment = VCSReviewComment {
+                id: comment.id,
+                body: comment.body,
+                author: comment.user.login.clone(),
+                path: comment.path,
+                line: comment.line,
+                created_at: comment.created_at,
+                updated_at: comment.updated_at,
+            };
+
+            if let Some(review_id) = comment.pull_request_review_id {
+                comments_by_review
+                    .entry(review_id)
+                    .or_default()
+                    .push(vcs_comment);
+            } else {
+                orphan_comments.push(vcs_comment);
+            }
+        }
+
+        // Build reviews with their comments
+        let mut result: Vec<VCSReview> = reviews
+            .into_iter()
+            .map(|review| {
+                let review_comments = comments_by_review.remove(&review.id).unwrap_or_default();
+                VCSReview {
+                    id: review.id,
+                    author: review.user.login,
+                    state: review.state,
+                    body: review.body,
+                    submitted_at: review.submitted_at,
+                    comments: review_comments,
+                }
+            })
+            .collect();
+
+        // Add orphan comments as a synthetic review if any exist
+        if !orphan_comments.is_empty() {
+            result.push(VCSReview {
+                id: 0, // Synthetic ID
+                author: "various".to_string(),
+                state: "COMMENTED".to_string(),
+                body: None,
+                submitted_at: None,
+                comments: orphan_comments,
+            });
+        }
+
+        Ok(result)
+    }
+
+    /// Checks if a user has write access to a GitHub repository
+    pub async fn check_github_user_permission(
+        &self,
+        creds: &GitHubCredentials,
+        owner: &str,
+        repo: &str,
+        username: &str,
+    ) -> VCSResult<UserPermission> {
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/collaborators/{}/permission",
+            owner, repo, username
+        );
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", creds.token))
+            .header("User-Agent", "delidev")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(VCSError::Http)?;
+
+        let status = response.status();
+
+        if status == 401 {
+            return Err(VCSError::AuthFailed);
+        }
+
+        if status == 404 {
+            // User is not a collaborator
+            return Ok(UserPermission::None);
+        }
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(VCSError::ApiError(format!(
+                "GitHub API returned status {}: {}",
+                status,
+                sanitize_api_error(&body)
+            )));
+        }
+
+        let permission: GitHubPermissionResponse = response.json().await.map_err(|e| {
+            VCSError::ParseError(format!("Failed to parse GitHub permission response: {}", e))
+        })?;
+
+        Ok(match permission.permission.as_str() {
+            "admin" => UserPermission::Admin,
+            "write" | "maintain" => UserPermission::Write,
+            "read" | "triage" => UserPermission::Read,
+            _ => UserPermission::None,
+        })
+    }
+
+    /// Checks if a user has write access to a GitHub repository
+    pub async fn has_github_write_access(
+        &self,
+        creds: &GitHubCredentials,
+        owner: &str,
+        repo: &str,
+        username: &str,
+    ) -> VCSResult<bool> {
+        let permission = self
+            .check_github_user_permission(creds, owner, repo, username)
+            .await?;
+        Ok(matches!(
+            permission,
+            UserPermission::Admin | UserPermission::Write
+        ))
+    }
+
     // ========== GitLab Operations ==========
 
     /// Validates GitLab credentials and returns user info
@@ -426,9 +846,61 @@ struct GitHubPR {
 }
 
 #[derive(Deserialize)]
+struct GitHubPRDetail {
+    head: GitHubRefDetail,
+}
+
+#[derive(Deserialize)]
 struct GitHubRef {
     #[serde(rename = "ref")]
     ref_field: String,
+}
+
+#[derive(Deserialize)]
+struct GitHubRefDetail {
+    sha: String,
+}
+
+#[derive(Deserialize)]
+struct GitHubCheckRunsResponse {
+    check_runs: Vec<GitHubCheckRun>,
+}
+
+#[derive(Deserialize)]
+struct GitHubCheckRun {
+    id: u64,
+    name: String,
+    status: String,
+    conclusion: Option<String>,
+    details_url: Option<String>,
+    started_at: Option<String>,
+    completed_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GitHubReview {
+    id: u64,
+    user: GitHubUser,
+    state: String,
+    body: Option<String>,
+    submitted_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GitHubReviewComment {
+    id: u64,
+    body: String,
+    user: GitHubUser,
+    path: Option<String>,
+    line: Option<u64>,
+    created_at: String,
+    updated_at: String,
+    pull_request_review_id: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct GitHubPermissionResponse {
+    permission: String,
 }
 
 #[derive(Deserialize)]
