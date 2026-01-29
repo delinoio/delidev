@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
-use crate::entities::{GlobalConfig, LicenseCredentials, RepositoryConfig, VCSCredentials};
+use crate::entities::{GlobalConfig, RepositoryConfig, VCSCredentials};
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -55,11 +55,6 @@ impl ConfigManager {
     /// Returns path to database file
     pub fn database_path(&self) -> PathBuf {
         self.global_config_dir.join("delidev.db")
-    }
-
-    /// Returns path to license credentials file
-    pub fn license_credentials_path(&self) -> PathBuf {
-        self.global_config_dir.join("license.toml")
     }
 
     /// Loads global configuration
@@ -116,36 +111,6 @@ impl ConfigManager {
                  restricted to your user account only.",
                 path
             );
-        }
-
-        Ok(())
-    }
-
-    /// Loads license credentials
-    pub fn load_license_credentials(&self) -> ConfigResult<LicenseCredentials> {
-        let path = self.license_credentials_path();
-        if !path.exists() {
-            return Ok(LicenseCredentials::default());
-        }
-
-        let content = std::fs::read_to_string(&path)?;
-        let creds: LicenseCredentials = toml::from_str(&content)?;
-        Ok(creds)
-    }
-
-    /// Saves license credentials
-    pub fn save_license_credentials(&self, creds: &LicenseCredentials) -> ConfigResult<()> {
-        let path = self.license_credentials_path();
-        let content = toml::to_string_pretty(creds)?;
-        std::fs::write(&path, content)?;
-
-        // Set restrictive permissions on license file (Unix only)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = std::fs::metadata(&path)?.permissions();
-            perms.set_mode(0o600);
-            std::fs::set_permissions(&path, perms)?;
         }
 
         Ok(())

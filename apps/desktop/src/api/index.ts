@@ -13,7 +13,6 @@ import type {
   VCSProviderType,
   AIAgentType,
   AgentTask,
-  LicenseInfo,
   Workspace,
   RepositoryGroup,
 } from "../types";
@@ -693,74 +692,6 @@ export async function getStreamMessages(
   sessionId: string
 ): Promise<AgentStreamMessageEntry[]> {
   return invoke("get_stream_messages", { sessionId });
-}
-
-// ========== License API ==========
-
-/**
- * Gets the current license information
- */
-export async function getLicenseInfo(): Promise<LicenseInfo> {
-  return invoke("get_license_info");
-}
-
-/**
- * Checks if a license is configured
- */
-export async function hasLicense(): Promise<boolean> {
-  return invoke("has_license");
-}
-
-/**
- * Checks if the license is valid and active
- */
-export async function isLicenseValid(): Promise<boolean> {
-  return invoke("is_license_valid");
-}
-
-/**
- * Validates the current license key with Polar.sh
- */
-export async function validateLicense(): Promise<LicenseInfo> {
-  return invoke("validate_license");
-}
-
-/**
- * Activates a license key for this device
- */
-export async function activateLicense(
-  key: string,
-  deviceLabel?: string
-): Promise<LicenseInfo> {
-  return invoke("activate_license", { key, deviceLabel });
-}
-
-/**
- * Deactivates the license for this device
- */
-export async function deactivateLicense(): Promise<void> {
-  return invoke("deactivate_license");
-}
-
-/**
- * Sets a license key without activation (for keys that don't require activation)
- */
-export async function setLicenseKey(key: string): Promise<LicenseInfo> {
-  return invoke("set_license_key", { key });
-}
-
-/**
- * Removes the license key from this device
- */
-export async function removeLicense(): Promise<void> {
-  return invoke("remove_license");
-}
-
-/**
- * Gets the suggested device label for activation
- */
-export async function getDeviceLabel(): Promise<string> {
-  return invoke("get_device_label");
 }
 
 // ========== TTY Input API ==========
