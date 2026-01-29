@@ -20,10 +20,8 @@ import { useRepositoryGroupsStore } from "../../stores/repositoryGroups";
 import { useWorkspacesStore } from "../../stores/workspaces";
 import { useTasksStore } from "../../stores/tasks";
 import { useConfigStore } from "../../stores/config";
-import { AIAgentType, LicenseStatus, type LicenseInfo } from "../../types";
+import { AIAgentType } from "../../types";
 import * as api from "../../api";
-import { AlertTriangle } from "lucide-react";
-import { PremiumBadge } from "../ui/premium-badge";
 import { RepositoryGroupSelector } from "../repositoryGroups/RepositoryGroupSelector";
 
 interface CreateTaskDialogProps {
@@ -74,7 +72,6 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
   const [planningAgentType, setPlanningAgentType] = useState<AIAgentType>(AIAgentType.ClaudeCode);
   const [executionAgentType, setExecutionAgentType] = useState<AIAgentType>(AIAgentType.ClaudeCode);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
 
   const { repositories, fetchRepositories } = useRepositoriesStore();
   const { groups, fetchGroups } = useRepositoryGroupsStore();
@@ -88,8 +85,6 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
       fetchGroups();
       fetchGlobalConfig();
       getDefaultWorkspace().catch(console.error);
-      // Fetch license info to check if AI-generated fields are available
-      api.getLicenseInfo().then(setLicenseInfo).catch(console.error);
     }
   }, [open, fetchRepositories, fetchGroups, fetchGlobalConfig, getDefaultWorkspace]);
 
@@ -118,6 +113,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
 
     if (!repositoryGroupId) return;
     if (!prompt) return;
+    if (!title) return; // Title is now required
 
     // Save current selections to localStorage for next time
     safeSetLocalStorage(STORAGE_KEY_REPOSITORY_GROUP, repositoryGroupId);
@@ -129,7 +125,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
         const task = await createCompositeTask({
           repositoryGroupId,
           prompt,
-          title: title || undefined,
+          title,
           planningAgentType,
           executionAgentType,
         });
@@ -151,11 +147,12 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
         navigate(`/composite-tasks/${task.id}`);
       } else {
         // Create UnitTask and auto-execute if Docker is available
+        // Use empty string for branch name if not provided (will use default branch name generation)
         const task = await createUnitTask({
           repositoryGroupId,
           prompt,
-          title: title || undefined,
-          branchName: branchName || undefined,
+          title,
+          branchName: branchName || "",
           agentType,
         });
 
@@ -200,15 +197,6 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
     }
   };
 
-
-  // Check if license is valid for AI-generated fields
-  const isLicenseValid = licenseInfo?.status === LicenseStatus.Active;
-  // Show warning if user is relying on AI-generated fields but license is not active
-  const needsAIGeneratedFields = !title || (!isComposite && !branchName);
-  const showLicenseWarning = needsAIGeneratedFields && !isLicenseValid;
-  // Composite mode requires a license
-  const compositeRequiresLicense = isComposite && !isLicenseValid;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -248,53 +236,31 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
           </div>
 
           <div className="space-y-4 rounded-lg border p-4">
-            <Label className="text-sm font-medium">Title & Branch (Optional)</Label>
+            <Label className="text-sm font-medium">Title & Branch</Label>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="title" className="text-xs text-muted-foreground">Task Title</Label>
+                <Label htmlFor="title" className="text-xs text-muted-foreground">Task Title (required)</Label>
                 <Input
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Auto-generated with AI"
+                  placeholder="Enter a descriptive title"
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="branchName" className="text-xs text-muted-foreground">Branch Name</Label>
+                <Label htmlFor="branchName" className="text-xs text-muted-foreground">Branch Name (optional)</Label>
                 <Input
                   id="branchName"
                   value={branchName}
                   onChange={(e) => setBranchName(e.target.value)}
-                  placeholder="Auto-generated with AI"
+                  placeholder="Leave empty for default"
                 />
               </div>
             </div>
-            {showLicenseWarning ? (
-              <div className="flex items-start gap-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                <div className="text-xs text-yellow-600">
-                  <p className="font-medium">License required for AI-generated fields</p>
-                  <p className="mt-1">
-                    {isComposite
-                      ? "Title will not be auto-generated."
-                      : !title && !branchName
-                        ? "Title and branch name will not be auto-generated."
-                        : !title
-                          ? "Title will not be auto-generated."
-                          : "Branch name will not be auto-generated."}
-                    {" "}Please enter them manually or{" "}
-                    <a href="/settings/license" className="underline hover:no-underline">
-                      configure your license
-                    </a>
-                    .
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Leave empty for AI-generated suggestions (requires license).
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              Provide a descriptive title for the task. Branch name is optional and will use a default pattern if not provided.
+            </p>
           </div>
 
           {isComposite ? (
@@ -347,9 +313,8 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
                 onCheckedChange={setIsComposite}
               />
               <div className="flex-1">
-                <Label htmlFor="composite" className="cursor-pointer flex items-center gap-2">
+                <Label htmlFor="composite" className="cursor-pointer">
                   Composite mode
-                  <PremiumBadge />
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   Creates a CompositeTask with AI-generated plan. Uncheck for
@@ -357,21 +322,6 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
                 </p>
               </div>
             </div>
-            {compositeRequiresLicense && (
-              <div className="flex items-start gap-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 p-3">
-                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                <div className="text-xs text-yellow-600">
-                  <p className="font-medium">License required for Composite mode</p>
-                  <p className="mt-1">
-                    Composite mode is a premium feature. Please{" "}
-                    <a href="/settings/license" className="underline hover:no-underline">
-                      configure your license
-                    </a>
-                    {" "}or uncheck Composite mode to create a simple UnitTask.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
 
           <DialogFooter>
@@ -387,7 +337,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
               disabled={
                 isSubmitting ||
                 !prompt ||
-                compositeRequiresLicense ||
+                !title ||
                 !repositoryGroupId
               }
             >

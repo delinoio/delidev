@@ -5,8 +5,8 @@ use tokio::sync::{mpsc, RwLock};
 
 use super::{
     concurrency::PendingTask, AgentExecutionService, ConcurrencyService, ConfigWatcherService,
-    DockerService, GitService, LicenseService, NotificationService, RepositoryGroupService,
-    RepositoryService, TaskService, VCSProviderService, WorkspaceService, WorktreeCleanupService,
+    DockerService, GitService, NotificationService, RepositoryGroupService, RepositoryService,
+    TaskService, VCSProviderService, WorkspaceService, WorktreeCleanupService,
 };
 use crate::{
     config::ConfigManager,
@@ -44,13 +44,11 @@ pub struct AppState {
     pub agent_execution_service: Arc<RwLock<Option<Arc<AgentExecutionService>>>>,
     /// Notification service
     pub notification_service: Arc<NotificationService>,
-    /// License service for Polar.sh integration
-    pub license_service: Arc<LicenseService>,
     /// Config watcher service for hot-reloading configs
     pub config_watcher: Arc<RwLock<Option<ConfigWatcherService>>>,
     /// Worktree cleanup service for periodic orphaned worktree cleanup
     pub worktree_cleanup_service: Arc<WorktreeCleanupService>,
-    /// Concurrency service for managing agent session limits (premium feature)
+    /// Concurrency service for managing agent session limits
     pub concurrency_service: Arc<ConcurrencyService>,
     /// App handle for event emission (used when re-initializing services)
     app_handle: Option<AppHandle>,
@@ -103,11 +101,10 @@ impl AppState {
         };
         let vcs_service = Arc::new(VCSProviderService::new());
         let notification_service = Arc::new(NotificationService::new(app_handle.clone()));
-        let license_service = Arc::new(LicenseService::new(config_manager.clone()));
 
         // Initialize concurrency service early so it can be passed to execution
         // service
-        let concurrency_service = Arc::new(ConcurrencyService::new(license_service.clone()));
+        let concurrency_service = Arc::new(ConcurrencyService::new());
 
         // Create global config Arc for sharing
         let global_config = Arc::new(RwLock::new(global_config));
@@ -211,7 +208,6 @@ impl AppState {
             git_service,
             agent_execution_service,
             notification_service,
-            license_service,
             config_watcher: Arc::new(RwLock::new(config_watcher)),
             worktree_cleanup_service,
             concurrency_service,

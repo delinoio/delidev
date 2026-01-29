@@ -8,7 +8,7 @@ use crate::{
         AIAgentType, AgentTask, BaseRemote, CompositeTask, CompositeTaskStatus, ExecutionLog,
         MergeStrategy, Repository, UnitTask, UnitTaskStatus, VCSProviderType,
     },
-    services::{make_branch_name_unique, AppState, ConcurrencyError},
+    services::{AppState, ConcurrencyError},
 };
 
 /// Gets the primary repository from a repository group.
@@ -266,98 +266,6 @@ fn generate_title_from_prompt(prompt: &str) -> String {
     }
 }
 
-/// Generates a title and branch name from a prompt using the webapp API
-/// Returns None if the API call fails (e.g., no license, network error)
-async fn try_generate_title_and_branch_from_api(
-    license_service: &crate::services::LicenseService,
-    prompt: &str,
-) -> Option<(String, String)> {
-    tracing::info!("Attempting to generate title and branch name via AI");
-
-    // Check license status
-    let license_info = license_service.get_license_info().await;
-    if license_info.status != crate::entities::LicenseStatus::Active {
-        tracing::info!(
-            "AI title generation skipped: license not active (status: {:?})",
-            license_info.status
-        );
-        return None;
-    }
-
-    // Get the license key for the API call
-    let license_key = match license_service.get_license_key().await {
-        Some(key) => key,
-        None => {
-            tracing::warn!("AI title generation skipped: no license key available");
-            return None;
-        }
-    };
-
-    // Call the webapp API
-    let client = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("Failed to build HTTP client for AI title generation: {}", e);
-            return None;
-        }
-    };
-
-    let webapp_url =
-        std::env::var("DELIDEV_WEBAPP_URL").unwrap_or_else(|_| "https://deli.dev".to_string());
-
-    tracing::debug!(
-        "Calling AI title generation API at {}/api/generate-title-branch",
-        webapp_url
-    );
-
-    let response = match client
-        .post(format!("{}/api/generate-title-branch", webapp_url))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "prompt": prompt,
-            "licenseKey": license_key
-        }))
-        .send()
-        .await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!("AI title generation API request failed: {}", e);
-            return None;
-        }
-    };
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let error_text = response.text().await.unwrap_or_default();
-        tracing::error!(
-            "AI title generation API returned error status {}: {}",
-            status,
-            error_text
-        );
-        return None;
-    }
-
-    let result: GeneratedTaskInfo = match response.json().await {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!("Failed to parse AI title generation response: {}", e);
-            return None;
-        }
-    };
-
-    tracing::info!(
-        "AI generated title: '{}', branch: '{}'",
-        result.title,
-        result.branch_name
-    );
-
-    Some((result.title, result.branch_name))
-}
-
 /// Creates a new unit task
 #[tauri::command]
 pub async fn create_unit_task(
@@ -387,47 +295,11 @@ pub async fn create_unit_task(
         .map_err(|e| e.to_string())?
         .ok_or("Repository not found")?;
 
-    // Generate title and branch if not provided
-    // Try AI generation first (requires valid license), fall back to simple
-    // generation
-    // Note: AI-generated branch names get a unique suffix to prevent conflicts
-    let (task_title, generated_branch) = match (&title, &branch_name) {
-        (Some(t), Some(b)) => (t.clone(), Some(b.clone())),
-        (Some(t), None) => {
-            // Title provided, try to generate branch from API
-            let branch = if let Some((_, b)) =
-                try_generate_title_and_branch_from_api(&state.license_service, &prompt).await
-            {
-                // Add unique suffix to AI-generated branch name to prevent conflicts
-                Some(make_branch_name_unique(&b))
-            } else {
-                None
-            };
-            (t.clone(), branch)
-        }
-        (None, Some(b)) => {
-            // Branch provided, try to generate title from API
-            let title = if let Some((t, _)) =
-                try_generate_title_and_branch_from_api(&state.license_service, &prompt).await
-            {
-                t
-            } else {
-                generate_title_from_prompt(&prompt)
-            };
-            (title, Some(b.clone()))
-        }
-        (None, None) => {
-            // Neither provided, try to generate both from API
-            if let Some((t, b)) =
-                try_generate_title_and_branch_from_api(&state.license_service, &prompt).await
-            {
-                // Add unique suffix to AI-generated branch name to prevent conflicts
-                (t, Some(make_branch_name_unique(&b)))
-            } else {
-                (generate_title_from_prompt(&prompt), None)
-            }
-        }
-    };
+    // Title is now required, fall back to generating from prompt if not provided
+    let task_title = title.unwrap_or_else(|| generate_title_from_prompt(&prompt));
+    // Branch name is optional - if not provided or empty, it will use default
+    // pattern
+    let generated_branch = branch_name.filter(|b| !b.is_empty());
 
     // Create agent task with optional agent type
     let agent_task_id = uuid::Uuid::new_v4().to_string();
@@ -783,22 +655,8 @@ pub async fn create_composite_task(
         .map_err(|e| e.to_string())?
         .ok_or("Repository not found")?;
 
-    // Generate title if not provided
-    // Try AI generation first (requires valid license), fall back to simple
-    // generation
-    let task_title = match &title {
-        Some(t) => t.clone(),
-        None => {
-            // Try to generate title from API
-            if let Some((t, _)) =
-                try_generate_title_and_branch_from_api(&state.license_service, &prompt).await
-            {
-                t
-            } else {
-                generate_title_from_prompt(&prompt)
-            }
-        }
-    };
+    // Title is now required, fall back to generating from prompt if not provided
+    let task_title = title.unwrap_or_else(|| generate_title_from_prompt(&prompt));
 
     // Create planning agent task with optional agent type
     let planning_task_id = uuid::Uuid::new_v4().to_string();
@@ -1225,7 +1083,7 @@ pub async fn start_task_execution(
         .map_err(|e| e.to_string())?
         .ok_or("Agent task not found")?;
 
-    // Atomically check concurrency limits and register task (premium feature)
+    // Atomically check concurrency limits and register task
     // The TaskGuard ensures automatic cleanup even if execution panics
     let task_guard = {
         let global_config = state.global_config.read().await;
@@ -1246,7 +1104,6 @@ pub async fn start_task_execution(
                 );
                 return Ok(());
             }
-            Err(e) => return Err(e.to_string()),
         }
     };
 
@@ -2171,7 +2028,7 @@ async fn start_composite_task_execution(
             }
         };
 
-        // Atomically check concurrency limits and register task (premium feature)
+        // Atomically check concurrency limits and register task
         let task_guard = {
             let global_config = state.global_config.read().await;
             match state
@@ -2192,14 +2049,6 @@ async fn start_composite_task_execution(
                         unit_task.id,
                         current,
                         limit
-                    );
-                    continue;
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Cannot start node {} due to concurrency error: {}",
-                        node.id,
-                        e
                     );
                     continue;
                 }
@@ -2391,7 +2240,7 @@ pub async fn approve_composite_task_plan(
             }
         };
 
-        // Atomically check concurrency limits and register task (premium feature)
+        // Atomically check concurrency limits and register task
         let task_guard = {
             let global_config = state.global_config.read().await;
             match state
@@ -2412,14 +2261,6 @@ pub async fn approve_composite_task_plan(
                         unit_task.id,
                         current,
                         limit
-                    );
-                    continue;
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Cannot start node {} due to concurrency error: {}",
-                        node.id,
-                        e
                     );
                     continue;
                 }
@@ -2646,7 +2487,7 @@ pub async fn execute_composite_task_nodes(
         if unit_task.status != UnitTaskStatus::InProgress
             && unit_task.status != UnitTaskStatus::Done
         {
-            // Atomically check concurrency limits and register task (premium feature)
+            // Atomically check concurrency limits and register task
             let task_guard = {
                 let global_config = state.global_config.read().await;
                 match state
@@ -2666,14 +2507,6 @@ pub async fn execute_composite_task_nodes(
                             unit_task.id,
                             current,
                             limit
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Cannot start task {} due to concurrency error: {}",
-                            unit_task.id,
-                            e
                         );
                         continue;
                     }
@@ -2745,17 +2578,10 @@ pub async fn execute_composite_task_nodes(
     Ok(started_task_ids)
 }
 
-/// Response from the title/branch generation endpoint
-#[derive(serde::Deserialize, serde::Serialize)]
-pub struct GeneratedTaskInfo {
-    pub title: String,
-    #[serde(rename = "branchName")]
-    pub branch_name: String,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::make_branch_name_unique;
 
     #[test]
     fn test_parse_github_url_https() {
