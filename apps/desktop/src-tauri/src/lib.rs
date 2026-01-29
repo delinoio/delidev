@@ -99,16 +99,6 @@ pub fn run() {
             commands::reject_composite_task_plan,
             commands::update_composite_task_plan,
             commands::execute_composite_task_nodes,
-            // License commands
-            commands::get_license_info,
-            commands::has_license,
-            commands::is_license_valid,
-            commands::validate_license,
-            commands::activate_license,
-            commands::deactivate_license,
-            commands::set_license_key,
-            commands::remove_license,
-            commands::get_device_label,
             // Custom command commands
             commands::list_custom_commands,
             commands::get_custom_command,
@@ -162,19 +152,6 @@ pub fn run() {
             let app_handle = app.handle().clone();
             let state = tauri::async_runtime::block_on(async {
                 let state = AppState::new(Some(app_handle.clone())).await?;
-
-                // Validate license on startup if configured
-                if state.license_service.has_license().await {
-                    match state.license_service.validate_license().await {
-                        Ok(info) => {
-                            tracing::info!("License validated on startup: {:?}", info.status);
-                        }
-                        Err(e) => {
-                            tracing::warn!("Failed to validate license on startup: {}", e);
-                        }
-                    }
-                }
-
                 Ok::<_, anyhow::Error>(state)
             });
 
