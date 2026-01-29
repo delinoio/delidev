@@ -7,7 +7,6 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select } from "../components/ui/select";
 import { SimpleCheckbox } from "../components/ui/checkbox";
-import { PremiumBadge } from "../components/ui/premium-badge";
 import {
   Card,
   CardContent,
@@ -15,10 +14,9 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Loader2, Save, Check, X, Key, RefreshCw, Trash2 } from "lucide-react";
-import { AIAgentType, ContainerRuntime, EditorType, LicenseStatus, type GlobalConfig, type LicenseInfo } from "../types";
+import { Loader2, Save, Check, X } from "lucide-react";
+import { AIAgentType, ContainerRuntime, EditorType, type GlobalConfig } from "../types";
 import { cn } from "../lib/utils";
-import * as api from "../api";
 
 const agentTypeOptions = [
   { value: AIAgentType.ClaudeCode, label: "Claude Code" },
@@ -55,7 +53,6 @@ enum SettingsTab {
   Global = "global",
   Notifications = "notifications",
   Credentials = "credentials",
-  License = "license",
 }
 
 const validTabs = Object.values(SettingsTab);
@@ -101,26 +98,10 @@ export function Settings() {
   const [bitbucketPassword, setBitbucketPassword] = useState("");
   const [credentialSaving, setCredentialSaving] = useState<string | null>(null);
 
-  // License state
-  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
-  const [licenseKey, setLicenseKey] = useState("");
-  const [licenseLoading, setLicenseLoading] = useState(false);
-  const [licenseError, setLicenseError] = useState<string | null>(null);
-
   useEffect(() => {
     fetchGlobalConfig();
     fetchCredentialsStatus();
-    fetchLicenseInfo();
   }, [fetchGlobalConfig, fetchCredentialsStatus]);
-
-  const fetchLicenseInfo = async () => {
-    try {
-      const info = await api.getLicenseInfo();
-      setLicenseInfo(info);
-    } catch (err) {
-      logError("Failed to fetch license info:", err);
-    }
-  };
 
   useEffect(() => {
     if (globalConfig) {
@@ -179,103 +160,6 @@ export function Settings() {
       logError("Failed to save Bitbucket credentials:", error);
     } finally {
       setCredentialSaving(null);
-    }
-  };
-
-  const handleActivateLicense = async () => {
-    if (!licenseKey) return;
-    setLicenseLoading(true);
-    setLicenseError(null);
-    try {
-      // First try to set license key using validation (for licenses without activation limits)
-      // If the license requires activation, this will fail and we fall back to activate
-      const info = await api.setLicenseKey(licenseKey);
-      setLicenseInfo(info);
-      setLicenseKey("");
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      // If validation says activation is required, try activation instead
-      if (errorMessage.includes("requires activation")) {
-        try {
-          const info = await api.activateLicense(licenseKey);
-          setLicenseInfo(info);
-          setLicenseKey("");
-          return;
-        } catch (activateErr) {
-          const activateErrorMessage = activateErr instanceof Error ? activateErr.message : String(activateErr);
-          setLicenseError(activateErrorMessage);
-          logError("Failed to activate license:", activateErr);
-        }
-      } else {
-        setLicenseError(errorMessage);
-        logError("Failed to set license key:", err);
-      }
-    } finally {
-      setLicenseLoading(false);
-    }
-  };
-
-  const handleValidateLicense = async () => {
-    setLicenseLoading(true);
-    setLicenseError(null);
-    try {
-      const info = await api.validateLicense();
-      setLicenseInfo(info);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setLicenseError(errorMessage);
-      logError("Failed to validate license:", err);
-    } finally {
-      setLicenseLoading(false);
-    }
-  };
-
-  const handleRemoveLicense = async () => {
-    setLicenseLoading(true);
-    setLicenseError(null);
-    try {
-      await api.removeLicense();
-      setLicenseInfo({ status: LicenseStatus.NotConfigured });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      setLicenseError(errorMessage);
-      logError("Failed to remove license:", err);
-    } finally {
-      setLicenseLoading(false);
-    }
-  };
-
-  const getLicenseStatusColor = (status: LicenseStatus) => {
-    switch (status) {
-      case LicenseStatus.Active:
-        return "text-green-500";
-      case LicenseStatus.Expired:
-      case LicenseStatus.Invalid:
-      case LicenseStatus.Revoked:
-        return "text-destructive";
-      case LicenseStatus.Pending:
-        return "text-yellow-500";
-      default:
-        return "text-muted-foreground";
-    }
-  };
-
-  const getLicenseStatusLabel = (status: LicenseStatus) => {
-    switch (status) {
-      case LicenseStatus.Active:
-        return "Active";
-      case LicenseStatus.Expired:
-        return "Expired";
-      case LicenseStatus.Invalid:
-        return "Invalid";
-      case LicenseStatus.Revoked:
-        return "Revoked";
-      case LicenseStatus.Pending:
-        return "Pending";
-      case LicenseStatus.NotConfigured:
-        return "Not Configured";
-      default:
-        return "Unknown";
     }
   };
 
@@ -349,17 +233,6 @@ export function Settings() {
         >
           VCS Credentials
         </button>
-        <button
-          className={cn(
-            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
-            activeTab === SettingsTab.License
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-          onClick={() => setActiveTab(SettingsTab.License)}
-        >
-          License
-        </button>
       </div>
 
       {activeTab === SettingsTab.Global && localConfig && (
@@ -367,10 +240,7 @@ export function Settings() {
           {/* Learning Settings */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Learning
-                <PremiumBadge />
-              </CardTitle>
+              <CardTitle>Learning</CardTitle>
               <CardDescription>
                 Configure how DeliDev learns from code reviews.
               </CardDescription>
@@ -383,7 +253,6 @@ export function Settings() {
                   onCheckedChange={(checked) =>
                     updateConfig(["learning", "auto_learn_from_reviews"], checked)
                   }
-                  disabled={licenseInfo?.status !== LicenseStatus.Active}
                 />
                 <div>
                   <Label htmlFor="autoLearn">Auto-learn from reviews</Label>
@@ -618,10 +487,7 @@ export function Settings() {
           {/* Concurrency Settings */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Concurrency
-                <PremiumBadge />
-              </CardTitle>
+              <CardTitle>Concurrency</CardTitle>
               <CardDescription>
                 Limit the maximum number of concurrent agent sessions.
               </CardDescription>
@@ -655,7 +521,6 @@ export function Settings() {
                     }
                     // Invalid values (NaN, 0, negative) are ignored - the input keeps the previous valid value
                   }}
-                  disabled={licenseInfo?.status !== LicenseStatus.Active}
                 />
                 <p className="text-xs text-muted-foreground">
                   Maximum number of agent sessions that can run simultaneously. Leave empty for unlimited.
@@ -975,150 +840,6 @@ export function Settings() {
               >
                 Create app password on Bitbucket
               </a>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === SettingsTab.License && (
-        <div className="space-y-6">
-          {/* License Status */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Key className="h-5 w-5" />
-                    License
-                  </CardTitle>
-                  <CardDescription>
-                    DeliDev requires a license for full functionality. $4/month via Polar.sh
-                  </CardDescription>
-                </div>
-                {licenseInfo && (
-                  <span className={cn("text-sm font-medium", getLicenseStatusColor(licenseInfo.status))}>
-                    {getLicenseStatusLabel(licenseInfo.status)}
-                  </span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {licenseError && (
-                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-                  <p className="text-sm text-destructive">{licenseError}</p>
-                </div>
-              )}
-
-              {licenseInfo?.status === LicenseStatus.Active ? (
-                <div className="space-y-4">
-                  {/* Active license info */}
-                  <div className="grid gap-3 text-sm">
-                    {licenseInfo.display_key && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">License Key:</span>
-                        <span className="font-mono">{licenseInfo.display_key}</span>
-                      </div>
-                    )}
-                    {licenseInfo.customer_email && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{licenseInfo.customer_email}</span>
-                      </div>
-                    )}
-                    {licenseInfo.customer_name && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Name:</span>
-                        <span>{licenseInfo.customer_name}</span>
-                      </div>
-                    )}
-                    {licenseInfo.expires_at && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Expires:</span>
-                        <span>{new Date(licenseInfo.expires_at).toLocaleDateString()}</span>
-                      </div>
-                    )}
-                    {licenseInfo.activation_limit && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Activations:</span>
-                        <span>{licenseInfo.activations_used ?? 1} / {licenseInfo.activation_limit}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleValidateLicense}
-                      disabled={licenseLoading}
-                    >
-                      {licenseLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      Refresh
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRemoveLicense}
-                      disabled={licenseLoading}
-                    >
-                      {licenseLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                      Remove License
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* License activation form */}
-                  <div className="space-y-2">
-                    <Label htmlFor="licenseKey">License Key</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="licenseKey"
-                        type="password"
-                        placeholder="Enter your license key..."
-                        value={licenseKey}
-                        onChange={(e) => setLicenseKey(e.target.value)}
-                      />
-                      <Button
-                        onClick={handleActivateLicense}
-                        disabled={!licenseKey || licenseLoading}
-                      >
-                        {licenseLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Activate"
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Enter the license key you received from Polar.sh
-                    </p>
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Don't have a license?
-                    </p>
-                    <a
-                      href="https://deli.dev/checkout?productIds"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline"
-                    >
-                      Purchase a license
-                    </a>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

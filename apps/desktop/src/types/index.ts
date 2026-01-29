@@ -266,28 +266,6 @@ export interface RepositoryConfig {
   learning: RepositoryLearningConfig;
 }
 
-// License types
-export enum LicenseStatus {
-  Active = "active",
-  Expired = "expired",
-  Invalid = "invalid",
-  Revoked = "revoked",
-  Pending = "pending",
-  NotConfigured = "not_configured",
-}
-
-export interface LicenseInfo {
-  display_key?: string;
-  status: LicenseStatus;
-  customer_email?: string;
-  customer_name?: string;
-  expires_at?: string;
-  last_validated_at?: string;
-  activations_used?: number;
-  activation_limit?: number;
-  activation_id?: string;
-}
-
 // Custom Command types
 export enum CommandSource {
   Project = "project",
