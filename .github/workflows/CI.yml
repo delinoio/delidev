@@ -22,7 +22,7 @@ jobs:
 
   changes:
     name: Detect Changes
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -56,7 +56,7 @@ jobs:
 
   rust-fmt:
     name: Rust Format
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     steps:
@@ -73,7 +73,7 @@ jobs:
 
   rust-clippy:
     name: Rust Clippy
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     steps:
@@ -106,7 +106,7 @@ jobs:
 
   rust-test:
     name: Rust Test
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     needs: changes
     if: needs.changes.outputs.rust == 'true'
     steps:
@@ -140,7 +140,7 @@ jobs:
 
   frontend-typecheck:
     name: Frontend TypeCheck
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
 
@@ -164,7 +164,7 @@ jobs:
 
   frontend-lint:
     name: Frontend Lint
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
 
@@ -185,7 +185,7 @@ jobs:
 
   frontend-build:
     name: Frontend Build
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
 
@@ -275,7 +275,7 @@ jobs:
 
   ci-done:
     name: CI Done
-    runs-on: [self-hosted, linux]
+    runs-on: 'ubuntu-latest'
     if: always()
     needs:
       - changes
