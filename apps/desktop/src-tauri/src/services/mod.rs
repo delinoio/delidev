@@ -12,6 +12,8 @@ mod notification;
 mod repository;
 mod repository_group;
 mod task;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod update;
 mod vcs;
 mod workspace;
 mod worktree_cleanup;
@@ -30,6 +32,8 @@ pub use notification::*;
 pub use repository::*;
 pub use repository_group::*;
 pub use task::*;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub use update::*;
 pub use vcs::*;
 pub use workspace::*;
 pub use worktree_cleanup::*;
