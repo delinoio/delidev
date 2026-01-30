@@ -38,6 +38,7 @@ import * as api from "../api";
 import type { ExecutionLog } from "../api";
 import { StreamRenderer, type StreamEntry } from "../components/execution";
 import { TaskGraphVisualization } from "../components/graph";
+import { TokenUsageCard } from "../components/tasks";
 import { useTabsStore } from "../stores/tabs";
 import { CollapsibleText } from "../components/ui/collapsible-text";
 import { Textarea } from "../components/ui/textarea";
@@ -970,6 +971,9 @@ export function CompositeTaskDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Token Usage */}
+      <TokenUsageCard taskId={task.id} taskType="composite" />
     </div>
   );
 }

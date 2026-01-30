@@ -50,7 +50,7 @@ import {
 import type { ExecutionLog, ClaudeStreamEvent, TtyInputRequest } from "../api";
 import { StreamRenderer, type StreamEntry, TtyInputDialog } from "../components/execution";
 import { DiffViewer, ReviewSubmitDialog } from "../components/diff";
-import { RequestChangesDialog } from "../components/tasks";
+import { RequestChangesDialog, TokenUsageCard } from "../components/tasks";
 import { Select } from "../components/ui/select";
 import { Input } from "../components/ui/input";
 import { CollapsibleText } from "../components/ui/collapsible-text";
@@ -1330,6 +1330,9 @@ export function UnitTaskDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Token Usage */}
+      <TokenUsageCard taskId={task.id} taskType="unit" />
 
       {/* Auto-fix Attempts */}
       {task.auto_fix_task_ids.length > 0 && (

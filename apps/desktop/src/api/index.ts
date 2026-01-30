@@ -849,3 +849,37 @@ export async function renderCustomCommand(
   return invoke("render_custom_command", { repositoryId, commandName, arguments: args });
 }
 
+// ========== Token Usage API ==========
+
+/**
+ * Aggregated token usage summary for a task
+ */
+export interface TaskUsageSummary {
+  /** Total input tokens across all sessions */
+  total_input_tokens: number;
+  /** Total output tokens across all sessions */
+  total_output_tokens: number;
+  /** Total tokens (input + output) */
+  total_tokens: number;
+  /** Total cost in USD */
+  total_cost_usd: number;
+  /** Number of sessions included */
+  session_count: number;
+}
+
+/**
+ * Gets aggregated token usage summary for a unit task
+ * Includes usage from the main task and any auto-fix attempts
+ */
+export async function getUnitTaskUsage(taskId: string): Promise<TaskUsageSummary> {
+  return invoke("get_unit_task_usage", { taskId });
+}
+
+/**
+ * Gets aggregated token usage summary for a composite task
+ * Includes planning task and all unit tasks
+ */
+export async function getCompositeTaskUsage(taskId: string): Promise<TaskUsageSummary> {
+  return invoke("get_composite_task_usage", { taskId });
+}
+
