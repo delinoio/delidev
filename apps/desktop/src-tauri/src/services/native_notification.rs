@@ -251,10 +251,7 @@ impl NativeNotificationService {
             }
             let _guard = ThreadGuard;
 
-            let result = Notification::new()
-                .title(&title)
-                .message(&body)
-                .send();
+            let result = Notification::new().title(&title).message(&body).send();
 
             match result {
                 Ok(response) => {
