@@ -1048,7 +1048,8 @@ impl TaskService {
     // ========== Session Usage Operations ==========
 
     /// Extracts token usage from stream messages and saves session usage
-    /// This should be called after a session completes to record the final token usage
+    /// This should be called after a session completes to record the final
+    /// token usage
     pub async fn extract_and_save_session_usage(
         &self,
         session_id: &str,
@@ -1110,7 +1111,8 @@ impl TaskService {
         let created_at = usage.created_at.to_rfc3339();
 
         sqlx::query(
-            "INSERT INTO session_usage (id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at)
+            "INSERT INTO session_usage (id, session_id, input_tokens, output_tokens, \
+             total_tokens, cost_usd, model, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&usage.id)
@@ -1128,22 +1130,41 @@ impl TaskService {
     }
 
     /// Gets session usage for a specific session
+    #[allow(clippy::type_complexity)]
     pub async fn get_session_usage(
         &self,
         session_id: &str,
     ) -> DatabaseResult<Option<crate::entities::SessionUsage>> {
-        let row: Option<(String, String, i64, i64, i64, Option<f64>, Option<String>, String)> =
-            sqlx::query_as(
-                "SELECT id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at
+        let row: Option<(
+            String,
+            String,
+            i64,
+            i64,
+            i64,
+            Option<f64>,
+            Option<String>,
+            String,
+        )> = sqlx::query_as(
+            "SELECT id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, \
+             created_at
                  FROM session_usage
                  WHERE session_id = ?",
-            )
-            .bind(session_id)
-            .fetch_optional(self.db.pool())
-            .await?;
+        )
+        .bind(session_id)
+        .fetch_optional(self.db.pool())
+        .await?;
 
         match row {
-            Some((id, session_id, input_tokens, output_tokens, total_tokens, cost_usd, model, created_at_str)) => {
+            Some((
+                id,
+                session_id,
+                input_tokens,
+                output_tokens,
+                total_tokens,
+                cost_usd,
+                model,
+                created_at_str,
+            )) => {
                 let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
                     .map_err(|e| crate::database::DatabaseError::Migration(e.to_string()))?
                     .with_timezone(&chrono::Utc);
@@ -1168,7 +1189,8 @@ impl TaskService {
         &self,
         agent_task_id: &str,
     ) -> DatabaseResult<crate::entities::TaskUsageSummary> {
-        // Use a single query with JOIN to get aggregated usage for all sessions of this agent task
+        // Use a single query with JOIN to get aggregated usage for all sessions of this
+        // agent task
         let result: (i64, i64, i64, Option<f64>, i64) = sqlx::query_as(
             "SELECT
                 COALESCE(SUM(su.input_tokens), 0) as total_input,
@@ -1202,11 +1224,16 @@ impl TaskService {
         // Get the unit task to find the agent_task_id
         let unit_task = self.get_unit_task(unit_task_id).await?;
         let unit_task = unit_task.ok_or_else(|| {
-            crate::database::DatabaseError::NotFound(format!("Unit task {} not found", unit_task_id))
+            crate::database::DatabaseError::NotFound(format!(
+                "Unit task {} not found",
+                unit_task_id
+            ))
         })?;
 
         // Get usage for the main agent task
-        let mut summary = self.get_agent_task_usage_summary(&unit_task.agent_task_id).await?;
+        let mut summary = self
+            .get_agent_task_usage_summary(&unit_task.agent_task_id)
+            .await?;
 
         // Add usage from auto-fix tasks
         for auto_fix_id in &unit_task.auto_fix_task_ids {
