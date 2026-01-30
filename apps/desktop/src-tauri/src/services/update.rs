@@ -168,7 +168,7 @@ impl UpdateService {
             .download(
                 move |chunk_length, content_length| {
                     downloaded += chunk_length as u64;
-                    on_progress(downloaded, content_length.map(|c| c as u64));
+                    on_progress(downloaded, content_length);
                 },
                 || {
                     info!("Download finished");

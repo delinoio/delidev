@@ -24,7 +24,10 @@ pub async fn check_for_update(app: AppHandle) -> Result<UpdateCheckResponse, Str
 
     match update_service.check_for_update().await {
         Ok(Some(info)) => {
-            info!("Update available: {} -> {}", info.current_version, info.version);
+            info!(
+                "Update available: {} -> {}",
+                info.current_version, info.version
+            );
             Ok(UpdateCheckResponse {
                 update_available: true,
                 update_info: Some(info),
