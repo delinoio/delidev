@@ -8,12 +8,12 @@ mod diff;
 mod error;
 mod worktree;
 
+use std::path::Path;
+
 pub use branch::*;
 pub use diff::*;
 pub use error::*;
 pub use worktree::*;
-
-use std::path::Path;
 
 /// Main service for git operations
 pub struct GitOperations;

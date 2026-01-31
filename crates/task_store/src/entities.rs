@@ -37,7 +37,7 @@ impl UnitTaskStatus {
     }
 
     /// Parses a status from a string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "in_progress" => Some(Self::InProgress),
             "in_review" => Some(Self::InReview),
@@ -150,7 +150,7 @@ impl CompositeTaskStatus {
     }
 
     /// Parses a status from a string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "planning" => Some(Self::Planning),
             "pending_approval" => Some(Self::PendingApproval),
@@ -292,7 +292,7 @@ impl VcsProviderType {
     }
 
     /// Parses from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "github" => Some(Self::Github),
             "gitlab" => Some(Self::Gitlab),
@@ -469,7 +469,8 @@ mod tests {
 
         task.add_node(CompositeTaskNode::new("node-1", "unit-1"));
         task.add_node(
-            CompositeTaskNode::new("node-2", "unit-2").with_dependencies(vec!["node-1".to_string()]),
+            CompositeTaskNode::new("node-2", "unit-2")
+                .with_dependencies(vec!["node-1".to_string()]),
         );
 
         // Initially only node-1 is executable
@@ -487,7 +488,7 @@ mod tests {
     fn test_status_serialization() {
         assert_eq!(UnitTaskStatus::InProgress.as_str(), "in_progress");
         assert_eq!(
-            UnitTaskStatus::from_str("in_progress"),
+            UnitTaskStatus::parse("in_progress"),
             Some(UnitTaskStatus::InProgress)
         );
     }

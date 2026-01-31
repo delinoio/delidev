@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NormalizedMessage {
     /// Agent is starting
-    Start {
-        timestamp: DateTime<Utc>,
-    },
+    Start { timestamp: DateTime<Utc> },
 
     /// Text output from agent (assistant message)
     Text {
@@ -159,7 +157,10 @@ impl NormalizedMessage {
     }
 
     /// Creates a user question message
-    pub fn user_question(question: impl Into<String>, options: Option<Vec<QuestionOption>>) -> Self {
+    pub fn user_question(
+        question: impl Into<String>,
+        options: Option<Vec<QuestionOption>>,
+    ) -> Self {
         Self::UserQuestion {
             question: question.into(),
             options,
@@ -168,7 +169,11 @@ impl NormalizedMessage {
     }
 
     /// Creates a progress message
-    pub fn progress(phase: impl Into<String>, message: impl Into<String>, percentage: Option<u8>) -> Self {
+    pub fn progress(
+        phase: impl Into<String>,
+        message: impl Into<String>,
+        percentage: Option<u8>,
+    ) -> Self {
         Self::Progress {
             phase: phase.into(),
             message: message.into(),
@@ -234,11 +239,15 @@ mod tests {
     #[test]
     fn test_message_creation() {
         let text = NormalizedMessage::text("Hello, world!");
-        assert!(matches!(text, NormalizedMessage::Text { content, .. } if content == "Hello, world!"));
+        assert!(
+            matches!(text, NormalizedMessage::Text { content, .. } if content == "Hello, world!")
+        );
 
         let error = NormalizedMessage::error("Something went wrong", Some("E001".to_string()));
-        assert!(matches!(error, NormalizedMessage::Error { message, code, .. }
-            if message == "Something went wrong" && code == Some("E001".to_string())));
+        assert!(
+            matches!(error, NormalizedMessage::Error { message, code, .. }
+            if message == "Something went wrong" && code == Some("E001".to_string()))
+        );
     }
 
     #[test]

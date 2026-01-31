@@ -138,9 +138,7 @@ impl JsonRpcResponse {
     }
 
     /// Converts to a Result
-    pub fn into_result<T: serde::de::DeserializeOwned>(
-        self,
-    ) -> Result<T, JsonRpcError> {
+    pub fn into_result<T: serde::de::DeserializeOwned>(self) -> Result<T, JsonRpcError> {
         if let Some(error) = self.error {
             Err(error)
         } else if let Some(result) = self.result {
@@ -148,7 +146,9 @@ impl JsonRpcResponse {
                 JsonRpcError::internal_error(format!("Failed to deserialize result: {}", e))
             })
         } else {
-            Err(JsonRpcError::internal_error("Response has neither result nor error"))
+            Err(JsonRpcError::internal_error(
+                "Response has neither result nor error",
+            ))
         }
     }
 }
@@ -192,10 +192,8 @@ mod tests {
 
     #[test]
     fn test_response_error() {
-        let response = JsonRpcResponse::error(
-            Some(RequestId::Number(1)),
-            JsonRpcError::not_found("Task"),
-        );
+        let response =
+            JsonRpcResponse::error(Some(RequestId::Number(1)), JsonRpcError::not_found("Task"));
 
         assert!(!response.is_success());
         assert!(response.is_error());

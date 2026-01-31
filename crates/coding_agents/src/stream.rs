@@ -57,14 +57,10 @@ pub struct AssistantMessage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
     /// Text content
-    Text {
-        text: String,
-    },
+    Text { text: String },
 
     /// Thinking content
-    Thinking {
-        thinking: String,
-    },
+    Thinking { thinking: String },
 
     /// Tool use
     ToolUse {
@@ -157,14 +153,10 @@ impl ClaudeStreamParser {
                             messages.push(NormalizedMessage::tool_use(name, input));
                         }
                         ContentBlock::ToolResult {
-                            content,
-                            is_error,
-                            ..
+                            content, is_error, ..
                         } => {
                             messages.push(NormalizedMessage::tool_result(
-                                "unknown",
-                                content,
-                                !is_error,
+                                "unknown", content, !is_error,
                             ));
                         }
                     }
@@ -185,9 +177,7 @@ impl ClaudeStreamParser {
                             content, is_error, ..
                         } => {
                             messages.push(NormalizedMessage::tool_result(
-                                "unknown",
-                                content,
-                                !is_error,
+                                "unknown", content, !is_error,
                             ));
                         }
                     }
@@ -306,18 +296,12 @@ fn parse_option_line(line: &str) -> Option<(&str, &str)> {
     }
 
     let first = chars[0];
-    if first.is_ascii_digit() || first.is_ascii_alphabetic() {
-        if chars.len() > 1 {
-            let second = chars[1];
-            if second == '.' || second == ')' {
-                let label_end = if chars.len() > 2 && chars[2] == ' ' {
-                    1
-                } else {
-                    1
-                };
-                let rest_start = if chars.len() > 2 { 2 } else { chars.len() };
-                return Some((&line[..label_end], &line[rest_start..]));
-            }
+    if (first.is_ascii_digit() || first.is_ascii_alphabetic()) && chars.len() > 1 {
+        let second = chars[1];
+        if second == '.' || second == ')' {
+            let label_end = 1;
+            let rest_start = if chars.len() > 2 { 2 } else { chars.len() };
+            return Some((&line[..label_end], &line[rest_start..]));
         }
     }
 
@@ -339,12 +323,15 @@ mod tests {
 
     #[test]
     fn test_claude_stream_parser() {
-        let json = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Hello!"}]}}"#;
+        let json =
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Hello!"}]}}"#;
         let msg = ClaudeStreamParser::parse_line(json).unwrap();
         let normalized = ClaudeStreamParser::normalize(msg);
 
         assert_eq!(normalized.len(), 1);
-        assert!(matches!(&normalized[0], NormalizedMessage::Text { content, .. } if content == "Hello!"));
+        assert!(
+            matches!(&normalized[0], NormalizedMessage::Text { content, .. } if content == "Hello!")
+        );
     }
 
     #[test]

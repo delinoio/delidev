@@ -4,10 +4,11 @@ use std::collections::HashMap;
 
 use coding_agents::{AgentType, NormalizedMessage};
 use serde::{Deserialize, Serialize};
-use task_store::{CompositeTaskStatus, UnitTaskStatus};
+use task_store::UnitTaskStatus;
 
 /// All RPC method names
-pub mod methods {
+#[allow(dead_code)]
+pub mod method_names {
     // Task methods
     pub const CREATE_UNIT_TASK: &str = "createUnitTask";
     pub const GET_UNIT_TASK: &str = "getUnitTask";

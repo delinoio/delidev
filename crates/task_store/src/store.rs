@@ -116,7 +116,8 @@ pub trait TaskStore: Send + Sync {
     async fn get_repository_group(&self, id: &str) -> StoreResult<Option<RepositoryGroup>>;
 
     /// Lists repository groups for a workspace
-    async fn list_repository_groups(&self, workspace_id: &str) -> StoreResult<Vec<RepositoryGroup>>;
+    async fn list_repository_groups(&self, workspace_id: &str)
+        -> StoreResult<Vec<RepositoryGroup>>;
 
     /// Adds a repository to a group
     async fn add_repository_to_group(&self, group_id: &str, repository_id: &str)
@@ -171,8 +172,8 @@ impl TaskStore for MemoryStore {
                 filter
                     .repository_group_id
                     .as_ref()
-                    .map_or(true, |id| &t.repository_group_id == id)
-                    && filter.status.map_or(true, |s| t.status == s)
+                    .is_none_or(|id| &t.repository_group_id == id)
+                    && filter.status.is_none_or(|s| t.status == s)
             })
             .cloned()
             .collect();
@@ -258,7 +259,7 @@ impl TaskStore for MemoryStore {
         let tasks = self.composite_tasks.read().unwrap();
         let mut result: Vec<CompositeTask> = tasks
             .values()
-            .filter(|t| repository_group_id.map_or(true, |id| t.repository_group_id == id))
+            .filter(|t| repository_group_id.is_none_or(|id| t.repository_group_id == id))
             .cloned()
             .collect();
         result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -370,7 +371,10 @@ impl TaskStore for MemoryStore {
         Ok(groups.get(id).cloned())
     }
 
-    async fn list_repository_groups(&self, workspace_id: &str) -> StoreResult<Vec<RepositoryGroup>> {
+    async fn list_repository_groups(
+        &self,
+        workspace_id: &str,
+    ) -> StoreResult<Vec<RepositoryGroup>> {
         let groups = self.repository_groups.read().unwrap();
         Ok(groups
             .values()

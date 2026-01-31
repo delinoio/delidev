@@ -5,6 +5,7 @@ use keyring::Entry;
 use crate::{KeychainAccess, SecretError, SecretResult, KEYCHAIN_SERVICE};
 
 /// Keyring-based keychain accessor for Windows and Linux
+#[allow(dead_code)]
 #[derive(Debug, Default)]
 pub struct KeyringKeychain;
 
@@ -52,6 +53,7 @@ impl KeychainAccess for KeyringKeychain {
 }
 
 /// Creates the default keychain accessor for Windows/Linux
+#[allow(dead_code)]
 pub fn create_keychain() -> impl KeychainAccess {
     KeyringKeychain::new()
 }

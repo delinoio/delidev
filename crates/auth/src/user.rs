@@ -47,21 +47,16 @@ impl AuthenticatedUser {
 }
 
 /// Role-based access control
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum UserRole {
     /// Regular user
+    #[default]
     User,
     /// Administrator
     Admin,
     /// Worker server (internal)
     Worker,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        Self::User
-    }
 }
 
 impl UserRole {
@@ -122,8 +117,7 @@ mod tests {
         let user = AuthenticatedUser::new("user-123");
         assert_eq!(user.display_name(), "user-123");
 
-        let user_with_email =
-            AuthenticatedUser::new("user-123").with_email("test@example.com");
+        let user_with_email = AuthenticatedUser::new("user-123").with_email("test@example.com");
         assert_eq!(user_with_email.display_name(), "test@example.com");
 
         let user_with_name = AuthenticatedUser::new("user-123")

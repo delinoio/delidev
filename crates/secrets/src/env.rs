@@ -91,8 +91,8 @@ pub fn validate_secrets_for_agent(
 ) -> Result<(), Vec<String>> {
     let required_keys: &[&str] = match agent_type {
         "claude_code" => &[known_keys::ANTHROPIC_API_KEY], // Or CLAUDE_CODE_OAUTH_TOKEN
-        "open_code" => &[], // Can use various backends
-        "aider" => &[],     // Can use various backends
+        "open_code" => &[],                                // Can use various backends
+        "aider" => &[],                                    // Can use various backends
         "gemini_cli" => &[known_keys::GOOGLE_AI_API_KEY],
         "codex_cli" => &[known_keys::OPENAI_API_KEY],
         "amp" => &[known_keys::ANTHROPIC_API_KEY],
@@ -106,10 +106,11 @@ pub fn validate_secrets_for_agent(
         .collect();
 
     // Special case: Claude Code can use either OAuth or API key
-    if agent_type == "claude_code" && !missing.is_empty() {
-        if secrets.contains_key(known_keys::CLAUDE_CODE_OAUTH_TOKEN) {
-            return Ok(());
-        }
+    if agent_type == "claude_code"
+        && !missing.is_empty()
+        && secrets.contains_key(known_keys::CLAUDE_CODE_OAUTH_TOKEN)
+    {
+        return Ok(());
     }
 
     if missing.is_empty() {
@@ -130,10 +131,7 @@ mod tests {
             known_keys::CLAUDE_CODE_OAUTH_TOKEN.to_string(),
             "oauth-token".to_string(),
         );
-        secrets.insert(
-            known_keys::GITHUB_TOKEN.to_string(),
-            "gh-token".to_string(),
-        );
+        secrets.insert(known_keys::GITHUB_TOKEN.to_string(), "gh-token".to_string());
 
         let env = inject_secrets_to_env(secrets);
 
@@ -173,10 +171,7 @@ mod tests {
     #[test]
     fn test_validate_secrets_for_agent() {
         let mut secrets = HashMap::new();
-        secrets.insert(
-            known_keys::ANTHROPIC_API_KEY.to_string(),
-            "key".to_string(),
-        );
+        secrets.insert(known_keys::ANTHROPIC_API_KEY.to_string(), "key".to_string());
 
         assert!(validate_secrets_for_agent(&secrets, "claude_code").is_ok());
         assert!(validate_secrets_for_agent(&secrets, "gemini_cli").is_err());

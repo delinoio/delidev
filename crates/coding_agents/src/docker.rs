@@ -1,7 +1,6 @@
 //! Docker sandboxing for AI coding agents
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -120,7 +119,11 @@ impl SandboxConfig {
     }
 
     /// Adds a volume mount
-    pub fn with_volume(mut self, host_path: impl Into<String>, container_path: impl Into<String>) -> Self {
+    pub fn with_volume(
+        mut self,
+        host_path: impl Into<String>,
+        container_path: impl Into<String>,
+    ) -> Self {
         self.volumes.insert(host_path.into(), container_path.into());
         self
     }
@@ -173,7 +176,8 @@ pub struct DockerSandbox {
 impl DockerSandbox {
     /// Creates a new sandbox with the given configuration
     ///
-    /// Note: This does not start the container. Call `start()` to create and start the container.
+    /// Note: This does not start the container. Call `start()` to create and
+    /// start the container.
     pub fn new(config: SandboxConfig) -> Self {
         Self {
             config,
@@ -198,8 +202,9 @@ impl DockerSandbox {
 
     /// Starts the sandbox container
     ///
-    /// This is an async operation that will be implemented by platform-specific code.
-    /// The actual Docker/Podman API calls will be made by the desktop app or worker server.
+    /// This is an async operation that will be implemented by platform-specific
+    /// code. The actual Docker/Podman API calls will be made by the desktop
+    /// app or worker server.
     pub async fn start(&mut self) -> Result<(), SandboxError> {
         // This is a stub - actual implementation will use bollard or similar
         // For now, we just generate a mock container ID
@@ -210,8 +215,8 @@ impl DockerSandbox {
     /// Executes a command in the sandbox
     pub async fn exec(
         &self,
-        command: &str,
-        env: HashMap<String, String>,
+        _command: &str,
+        _env: HashMap<String, String>,
     ) -> Result<ExecHandle, SandboxError> {
         let container_id = self.container_id.as_ref().ok_or(SandboxError::NotRunning)?;
 
@@ -291,7 +296,10 @@ mod tests {
         assert_eq!(config.image, "custom:image");
         assert_eq!(config.runtime, ContainerRuntime::Podman);
         assert_eq!(config.work_dir, PathBuf::from("/app"));
-        assert_eq!(config.volumes.get("/host/path"), Some(&"/container/path".to_string()));
+        assert_eq!(
+            config.volumes.get("/host/path"),
+            Some(&"/container/path".to_string())
+        );
         assert_eq!(config.env.get("FOO"), Some(&"bar".to_string()));
         assert_eq!(config.memory_limit, Some("8g".to_string()));
     }

@@ -1,6 +1,8 @@
 //! macOS Keychain implementation using security-framework
 
-use security_framework::passwords::{delete_generic_password, get_generic_password, set_generic_password};
+use security_framework::passwords::{
+    delete_generic_password, get_generic_password, set_generic_password,
+};
 
 use crate::{KeychainAccess, SecretError, SecretResult, KEYCHAIN_SERVICE};
 

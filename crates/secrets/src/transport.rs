@@ -45,7 +45,7 @@ impl SecretPayload {
     pub fn is_valid_timestamp(&self) -> bool {
         let now = chrono::Utc::now().timestamp();
         let age = now - self.timestamp;
-        age >= 0 && age < 300 // 5 minutes
+        (0..300).contains(&age) // 5 minutes
     }
 
     /// Returns the number of secrets in the payload

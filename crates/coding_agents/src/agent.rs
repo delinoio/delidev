@@ -1,7 +1,6 @@
 //! AI coding agent trait and types
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use async_trait::async_trait;
 use futures::Stream;
@@ -328,7 +327,8 @@ mod tests {
         let session = AgentSession::new(AgentType::ClaudeCode);
         assert_eq!(session.effective_model(), "claude-sonnet-4-20250514");
 
-        let session_with_model = AgentSession::new(AgentType::ClaudeCode).with_model("custom-model");
+        let session_with_model =
+            AgentSession::new(AgentType::ClaudeCode).with_model("custom-model");
         assert_eq!(session_with_model.effective_model(), "custom-model");
     }
 

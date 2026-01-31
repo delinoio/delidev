@@ -1,7 +1,7 @@
 //! Secret management for DeliDev including keychain access
 //!
-//! This crate provides cross-platform keychain access and secure secret transport
-//! for AI agent credentials.
+//! This crate provides cross-platform keychain access and secure secret
+//! transport for AI agent credentials.
 
 mod env;
 mod error;
@@ -14,11 +14,11 @@ mod keychain_macos;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod keychain_keyring;
 
+use std::collections::HashMap;
+
 pub use env::*;
 pub use error::*;
 pub use transport::*;
-
-use std::collections::HashMap;
 
 /// Known secret keys used by AI agents
 pub mod known_keys {
@@ -146,13 +146,22 @@ mod tests {
     #[test]
     fn test_get_all_secrets() {
         let mut initial = HashMap::new();
-        initial.insert(known_keys::ANTHROPIC_API_KEY.to_string(), "sk-ant-123".to_string());
-        initial.insert(known_keys::OPENAI_API_KEY.to_string(), "sk-openai-456".to_string());
+        initial.insert(
+            known_keys::ANTHROPIC_API_KEY.to_string(),
+            "sk-ant-123".to_string(),
+        );
+        initial.insert(
+            known_keys::OPENAI_API_KEY.to_string(),
+            "sk-openai-456".to_string(),
+        );
 
         let keychain = MemoryKeychain::with_secrets(initial);
         let secrets = get_all_secrets(&keychain).unwrap();
 
         assert_eq!(secrets.len(), 2);
-        assert_eq!(secrets.get(known_keys::ANTHROPIC_API_KEY), Some(&"sk-ant-123".to_string()));
+        assert_eq!(
+            secrets.get(known_keys::ANTHROPIC_API_KEY),
+            Some(&"sk-ant-123".to_string())
+        );
     }
 }
