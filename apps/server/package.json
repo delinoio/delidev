@@ -2,6 +2,7 @@
   "name": "@delinoio/delidev-main-server",
   "private": true,
   "scripts": {
+    "prepare:app": "if [ ! -f .env ]; then cp .env.example .env; fi",
     "dev": "cargo run"
   }
 }
