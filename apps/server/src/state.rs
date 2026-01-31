@@ -1,11 +1,12 @@
 //! Application state
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use auth::{
     AuthStateStore, JwtAuth, MemoryAuthStateStore, OidcAuth, OidcConfig, PostgresAuthStateStore,
     SqliteAuthStateStore,
 };
+use secrets::SecretPayload;
 use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
@@ -39,6 +40,54 @@ pub struct AppState {
 
     /// Server configuration
     pub config: Arc<ServerConfig>,
+
+    /// Secret store for tasks (task_id -> secrets)
+    /// Note: Secrets are stored temporarily and cleared after task completion
+    pub secret_store: Arc<RwLock<TaskSecretStore>>,
+}
+
+/// Stores secrets for tasks temporarily until they are consumed by workers
+#[derive(Debug, Default)]
+pub struct TaskSecretStore {
+    secrets: HashMap<String, SecretPayload>,
+}
+
+impl TaskSecretStore {
+    /// Create a new task secret store
+    pub fn new() -> Self {
+        Self {
+            secrets: HashMap::new(),
+        }
+    }
+
+    /// Store secrets for a task
+    pub fn store(&mut self, payload: SecretPayload) {
+        self.secrets.insert(payload.task_id.clone(), payload);
+    }
+
+    /// Get and remove secrets for a task (one-time use)
+    pub fn take(&mut self, task_id: &str) -> Option<SecretPayload> {
+        self.secrets.remove(task_id)
+    }
+
+    /// Check if secrets exist for a task
+    pub fn has(&self, task_id: &str) -> bool {
+        self.secrets.contains_key(task_id)
+    }
+
+    /// Remove secrets for a task (e.g., on task cancellation)
+    pub fn remove(&mut self, task_id: &str) {
+        self.secrets.remove(task_id);
+    }
+
+    /// Clear all expired secrets (older than max age)
+    pub fn clear_expired(&mut self, max_age_secs: i64) {
+        let now = chrono::Utc::now().timestamp();
+        self.secrets.retain(|_, payload| {
+            let age = now - payload.timestamp;
+            age < max_age_secs
+        });
+    }
 }
 
 impl AppState {
@@ -154,6 +203,9 @@ impl AppState {
         // Initialize log broadcaster
         let log_broadcaster = Arc::new(LogBroadcaster::new());
 
+        // Initialize secret store
+        let secret_store = Arc::new(RwLock::new(TaskSecretStore::new()));
+
         Ok(Self {
             store,
             auth,
@@ -162,6 +214,7 @@ impl AppState {
             worker_registry,
             log_broadcaster,
             config: Arc::new(config),
+            secret_store,
         })
     }
 }

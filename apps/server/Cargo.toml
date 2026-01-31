@@ -12,6 +12,7 @@ task_store = { path = "../../crates/task_store" }
 rpc_protocol = { path = "../../crates/rpc_protocol" }
 auth = { path = "../../crates/auth", features = ["sqlx"] }
 coding_agents = { path = "../../crates/coding_agents" }
+secrets = { path = "../../crates/secrets" }
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono"] }

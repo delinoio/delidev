@@ -91,6 +91,9 @@ delidev-server = { path = "../../server" }
 rpc_protocol = { path = "../../../crates/rpc_protocol" }
 task_store = { path = "../../../crates/task_store" }
 
+# Secrets management
+secrets = { path = "../../../crates/secrets" }
+
 # Native notification support with click handlers
 [target.'cfg(target_os = "windows")'.dependencies]
 tauri-winrt-notification = "0.7"

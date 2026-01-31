@@ -855,3 +855,70 @@ export async function renderCustomCommand(
   return invoke("render_custom_command", { repositoryId, commandName, arguments: args });
 }
 
+// ========== Secrets API ==========
+
+/**
+ * Status of a secret in the keychain
+ */
+export interface SecretStatus {
+  key: string;
+  exists: boolean;
+}
+
+/**
+ * Known secret keys used by AI agents
+ */
+export const KNOWN_SECRET_KEYS = {
+  CLAUDE_CODE_OAUTH_TOKEN: "CLAUDE_CODE_OAUTH_TOKEN",
+  ANTHROPIC_API_KEY: "ANTHROPIC_API_KEY",
+  OPENAI_API_KEY: "OPENAI_API_KEY",
+  GOOGLE_AI_API_KEY: "GOOGLE_AI_API_KEY",
+  GITHUB_TOKEN: "GITHUB_TOKEN",
+} as const;
+
+export type SecretKey = typeof KNOWN_SECRET_KEYS[keyof typeof KNOWN_SECRET_KEYS];
+
+/**
+ * Gets the status of all known secrets (whether they exist, not their values)
+ */
+export async function getSecretsStatus(): Promise<SecretStatus[]> {
+  return invoke("get_secrets_status");
+}
+
+/**
+ * Gets a specific secret from the keychain
+ * @returns The secret value if it exists, null otherwise
+ */
+export async function getSecret(key: string): Promise<string | null> {
+  return invoke("get_secret", { key });
+}
+
+/**
+ * Sets a secret in the keychain
+ */
+export async function setSecret(key: string, value: string): Promise<void> {
+  return invoke("set_secret", { key, value });
+}
+
+/**
+ * Deletes a secret from the keychain
+ */
+export async function deleteSecret(key: string): Promise<void> {
+  return invoke("delete_secret", { key });
+}
+
+/**
+ * Gets all secrets for AI agent execution (from keychain)
+ * @returns A map of secret keys to their values
+ */
+export async function getAllSecretsForExecution(): Promise<Record<string, string>> {
+  return invoke("get_all_secrets_for_execution");
+}
+
+/**
+ * Gets the list of known secret keys
+ */
+export async function getKnownSecretKeys(): Promise<string[]> {
+  return invoke("get_known_secret_keys");
+}
+

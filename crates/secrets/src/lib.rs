@@ -9,10 +9,10 @@ mod transport;
 
 // Platform-specific keychain implementations
 #[cfg(target_os = "macos")]
-mod keychain_macos;
+pub mod keychain_macos;
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-mod keychain_keyring;
+pub mod keychain_keyring;
 
 use std::collections::HashMap;
 
