@@ -946,6 +946,76 @@ device_label = "hostname (platform)"
 | Deactivate | Remove license activation from this device |
 | Remove | Clear stored license credentials |
 
+### Secrets Management
+
+DeliDev provides cross-platform keychain access for storing AI agent credentials securely. Secrets are stored in the native system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service).
+
+#### Known Secret Keys
+
+| Key | Description | Used By |
+|-----|-------------|---------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code OAuth token | Claude Code |
+| `ANTHROPIC_API_KEY` | Anthropic API key | Claude Code, Amp |
+| `OPENAI_API_KEY` | OpenAI API key | OpenCode, Aider, Codex CLI |
+| `GOOGLE_AI_API_KEY` | Google AI API key | Gemini CLI |
+| `GITHUB_TOKEN` | GitHub personal access token | All agents (for GitHub operations) |
+
+#### Secret Storage
+
+Secrets are stored using the native system keychain:
+
+| Platform | Backend |
+|----------|---------|
+| macOS | Keychain Services (security-framework) |
+| Windows | Windows Credential Manager (keyring) |
+| Linux | Secret Service (libsecret/KWallet via keyring) |
+
+#### Client-to-Server Secret Transport
+
+In distributed mode, secrets flow from the client to the worker via the server:
+
+```
+┌─────────────┐    1. Client reads    ┌─────────────┐
+│   Client    │    secrets from       │   Native    │
+│   (Tauri)   │◄───────────────────── │  Keychain   │
+└──────┬──────┘    local keychain     └─────────────┘
+       │
+       │ 2. Client sends secrets
+       │    via sendSecrets RPC
+       ▼
+┌─────────────┐
+│   Server    │    3. Server stores
+│   (Main)    │    secrets temporarily
+└──────┬──────┘    (in-memory, per-task)
+       │
+       │ 4. Server relays secrets
+       │    when task starts
+       ▼
+┌─────────────┐
+│   Worker    │    5. Worker injects
+│             │    secrets as env vars
+└─────────────┘
+```
+
+**Security Considerations:**
+
+- Secrets are stored in the native OS keychain (encrypted at rest)
+- Transport uses TLS (HTTPS/WSS) for encryption in transit
+- Secrets are stored temporarily in server memory and cleared after task completion
+- Single-process mode reads secrets directly from local keychain (no network transport)
+
+#### Secret Injection
+
+Secrets are injected into the agent execution environment as environment variables:
+
+| Secret Key | Injected Environment Variables |
+|------------|-------------------------------|
+| `CLAUDE_CODE_OAUTH_TOKEN` | `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_OAUTH=1` |
+| `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` |
+| `OPENAI_API_KEY` | `OPENAI_API_KEY` |
+| `GOOGLE_AI_API_KEY` | `GOOGLE_AI_API_KEY`, `GEMINI_API_KEY` |
+| `GITHUB_TOKEN` | `GITHUB_TOKEN`, `GH_TOKEN` |
+
 ---
 
 ### AI Document Auto-Update

@@ -135,6 +135,13 @@ pub fn run() {
             commands::get_server_mode,
             commands::set_server_mode,
             commands::is_single_process_mode,
+            // Secrets commands
+            commands::get_secrets_status,
+            commands::get_secret,
+            commands::set_secret,
+            commands::delete_secret,
+            commands::get_all_secrets_for_execution,
+            commands::get_known_secret_keys,
         ])
         .setup(|app| {
             // Initialize tracing with Sentry integration

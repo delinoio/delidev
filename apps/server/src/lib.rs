@@ -16,5 +16,5 @@ pub use auth::AuthStateStore;
 pub use config::ServerConfig;
 pub use log_broadcaster::LogBroadcaster;
 pub use rpc::dispatch_method;
-pub use state::AppState;
+pub use state::{AppState, TaskSecretStore};
 pub use worker_registry::WorkerRegistry;

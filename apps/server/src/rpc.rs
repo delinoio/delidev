@@ -14,6 +14,7 @@ use rpc_protocol::{
     StartTaskExecutionResponse, StopTaskExecutionRequest, SuccessResponse,
     UpdateUnitTaskStatusRequest, WorkerHeartbeatRequest, WorkerHeartbeatResponse,
 };
+use secrets::SecretPayload;
 use task_store::{
     CompositeTask, CompositeTaskStatus, Repository, TaskFilter, UnitTask, UnitTaskStatus,
 };
@@ -418,13 +419,26 @@ async fn handle_get_execution_logs(
 // ========== Secret Handlers ==========
 
 async fn handle_send_secrets(
-    _state: &AppState,
+    state: &AppState,
     _user: &Option<AuthenticatedUser>,
     params: SendSecretsRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
-    // Store secrets for the task (would be forwarded to worker when task starts)
-    // For now, just acknowledge receipt
-    info!(task_id = %params.task_id, secret_count = %params.secrets.len(), "Received secrets");
+    // Create a secret payload
+    let payload = SecretPayload::new(params.task_id.clone(), params.secrets.clone());
+
+    // Validate the payload timestamp
+    if !payload.is_valid_timestamp() {
+        return Err(JsonRpcError::invalid_params(
+            "Secret payload timestamp is invalid".to_string(),
+        ));
+    }
+
+    // Store secrets for the task
+    let mut secret_store = state.secret_store.write().await;
+    let secret_count = payload.secret_count();
+    secret_store.store(payload);
+
+    info!(task_id = %params.task_id, secret_count = %secret_count, "Stored secrets for task");
 
     let response = SendSecretsResponse { accepted: true };
     serde_json::to_value(response).map_err(|e| JsonRpcError::internal_error(e.to_string()))
