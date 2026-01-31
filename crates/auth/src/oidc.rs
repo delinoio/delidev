@@ -218,6 +218,10 @@ pub struct AuthorizationState {
 
     /// Timestamp when this state was created
     pub created_at: i64,
+
+    /// Optional redirect URI after successful authentication
+    #[serde(default)]
+    pub redirect_uri: Option<String>,
 }
 
 impl AuthorizationState {
@@ -228,6 +232,18 @@ impl AuthorizationState {
             nonce: generate_random_string(32),
             code_verifier: Some(generate_random_string(64)),
             created_at: chrono::Utc::now().timestamp(),
+            redirect_uri: None,
+        }
+    }
+
+    /// Create new authorization state with a redirect URI
+    pub fn with_redirect_uri(redirect_uri: Option<String>) -> Self {
+        Self {
+            state: generate_random_string(32),
+            nonce: generate_random_string(32),
+            code_verifier: Some(generate_random_string(64)),
+            created_at: chrono::Utc::now().timestamp(),
+            redirect_uri,
         }
     }
 

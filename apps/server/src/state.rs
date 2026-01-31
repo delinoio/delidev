@@ -3,17 +3,23 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
+use std::time::Duration;
 
-use auth::{JwtAuth, OidcAuth, OidcConfig};
+use auth::{
+    AuthStateStore, JwtAuth, MemoryAuthStateStore, OidcAuth, OidcConfig, PostgresAuthStateStore,
+    SqliteAuthStateStore,
+};
 use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
 use crate::{
-    auth_routes::AuthStateStore,
     config::ServerConfig,
     log_broadcaster::LogBroadcaster,
     worker_registry::WorkerRegistry,
 };
+
+/// Default timeout for OIDC metadata discovery (30 seconds)
+const OIDC_DISCOVERY_TIMEOUT_SECS: u64 = 30;
 
 /// Application state shared across handlers
 #[derive(Clone)]
@@ -27,8 +33,8 @@ pub struct AppState {
     /// OIDC authentication client (None if not configured)
     pub oidc: Option<Arc<OidcAuth>>,
 
-    /// Auth state store for OIDC flow
-    pub auth_state_store: AuthStateStore,
+    /// Auth state store for OIDC flow (database-backed for production)
+    pub auth_state_store: Arc<dyn AuthStateStore>,
 
     /// Worker registry
     pub worker_registry: Arc<RwLock<WorkerRegistry>>,
@@ -75,8 +81,13 @@ impl AppState {
 
             let mut oidc_auth = OidcAuth::new(oidc_cfg);
 
-            // Try to discover OIDC provider metadata
-            match discover_oidc_metadata(&oidc_auth).await {
+            // Try to discover OIDC provider metadata with timeout
+            match discover_oidc_metadata_with_timeout(
+                &oidc_auth,
+                Duration::from_secs(OIDC_DISCOVERY_TIMEOUT_SECS),
+            )
+            .await
+            {
                 Ok(metadata) => {
                     tracing::info!(
                         issuer = %metadata.issuer,
@@ -97,8 +108,48 @@ impl AppState {
             None
         };
 
-        // Initialize auth state store
-        let auth_state_store = crate::auth_routes::create_auth_state_store();
+        // Initialize auth state store based on configuration
+        let auth_state_store: Arc<dyn AuthStateStore> = if config.single_user_mode {
+            // Single-user mode: use SQLite if database path is configured
+            match create_sqlite_auth_store(&config).await {
+                Ok(store) => {
+                    tracing::info!("Using SQLite for auth state storage");
+                    Arc::new(store)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "Failed to initialize SQLite auth store, falling back to in-memory"
+                    );
+                    Arc::new(MemoryAuthStateStore::new())
+                }
+            }
+        } else {
+            // Multi-user mode: use PostgreSQL
+            match config.database_url.as_ref() {
+                Some(database_url) => match create_postgres_auth_store(database_url).await {
+                    Ok(store) => {
+                        tracing::info!("Using PostgreSQL for auth state storage");
+                        Arc::new(store)
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            error = %e,
+                            "Failed to initialize PostgreSQL auth store"
+                        );
+                        return Err(StateError::Database(format!(
+                            "Failed to initialize auth state database: {}",
+                            e
+                        )));
+                    }
+                },
+                None => {
+                    return Err(StateError::Database(
+                        "DATABASE_URL is required for multi-user mode".to_string(),
+                    ));
+                }
+            }
+        };
 
         // Initialize worker registry
         let worker_registry = Arc::new(RwLock::new(WorkerRegistry::new(
@@ -120,12 +171,65 @@ impl AppState {
     }
 }
 
+/// Create a SQLite-backed auth state store
+async fn create_sqlite_auth_store(config: &ServerConfig) -> Result<SqliteAuthStateStore, String> {
+    // Ensure the database directory exists
+    if let Some(parent) = config.database_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create database directory: {}", e))?;
+    }
+
+    let database_url = format!("sqlite:{}?mode=rwc", config.database_path.display());
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .map_err(|e| format!("Failed to connect to SQLite: {}", e))?;
+
+    let store = SqliteAuthStateStore::new(pool);
+    store
+        .init()
+        .await
+        .map_err(|e| format!("Failed to initialize auth state table: {}", e))?;
+
+    Ok(store)
+}
+
+/// Create a PostgreSQL-backed auth state store
+async fn create_postgres_auth_store(database_url: &str) -> Result<PostgresAuthStateStore, String> {
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(10)
+        .connect(database_url)
+        .await
+        .map_err(|e| format!("Failed to connect to PostgreSQL: {}", e))?;
+
+    let store = PostgresAuthStateStore::new(pool);
+    store
+        .init()
+        .await
+        .map_err(|e| format!("Failed to initialize auth state table: {}", e))?;
+
+    Ok(store)
+}
+
+/// Discover OIDC provider metadata with a timeout
+async fn discover_oidc_metadata_with_timeout(
+    oidc: &OidcAuth,
+    timeout: Duration,
+) -> Result<auth::OidcProviderMetadata, Box<dyn std::error::Error + Send + Sync>> {
+    tokio::time::timeout(timeout, discover_oidc_metadata(oidc))
+        .await
+        .map_err(|_| "OIDC metadata discovery timed out".to_string())?
+}
+
 /// Discover OIDC provider metadata
 async fn discover_oidc_metadata(
     oidc: &OidcAuth,
 ) -> Result<auth::OidcProviderMetadata, Box<dyn std::error::Error + Send + Sync>> {
     let discovery_url = oidc.discovery_url();
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
 
     let response = client.get(&discovery_url).send().await?;
 

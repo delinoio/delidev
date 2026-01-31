@@ -7,9 +7,6 @@
 //! - `/auth/logout` - Logout (client-side token invalidation)
 //! - `/auth/me` - Get current user info
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use auth::{AuthenticatedUser, AuthorizationState, JwtAuth, TokenResponse, UserInfo};
 use axum::{
     extract::{Query, State},
@@ -18,18 +15,12 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use crate::state::AppState;
 
-/// In-memory storage for authorization states (would use Redis/database in production)
-pub type AuthStateStore = Arc<RwLock<HashMap<String, AuthorizationState>>>;
-
-/// Create a new auth state store
-pub fn create_auth_state_store() -> AuthStateStore {
-    Arc::new(RwLock::new(HashMap::new()))
-}
+/// Default expiration time for authorization states (10 minutes)
+pub const AUTH_STATE_EXPIRATION_SECS: i64 = 600;
 
 /// Login request (for initiating OIDC flow)
 #[derive(Debug, Deserialize)]
@@ -79,6 +70,10 @@ pub struct AuthTokenResponse {
     /// Refresh token (if available)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>,
+
+    /// Redirect URI (if provided during login)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub redirect_uri: Option<String>,
 }
 
 /// Token refresh request
@@ -138,6 +133,45 @@ impl IntoResponse for AuthErrorResponse {
     }
 }
 
+/// Validate a redirect URI against allowed patterns
+///
+/// Returns true if the redirect URI is allowed, false otherwise.
+/// This prevents open redirect vulnerabilities.
+fn is_valid_redirect_uri(redirect_uri: &str, allowed_origins: &[String]) -> bool {
+    // If no allowed origins are configured, only allow relative paths
+    if allowed_origins.is_empty() {
+        return redirect_uri.starts_with('/') && !redirect_uri.starts_with("//");
+    }
+
+    // Parse the redirect URI
+    let url = match url::Url::parse(redirect_uri) {
+        Ok(url) => url,
+        Err(_) => {
+            // If it's not a valid URL, check if it's a relative path
+            return redirect_uri.starts_with('/') && !redirect_uri.starts_with("//");
+        }
+    };
+
+    // Check against allowed origins
+    let redirect_origin = format!(
+        "{}://{}{}",
+        url.scheme(),
+        url.host_str().unwrap_or(""),
+        url.port().map(|p| format!(":{}", p)).unwrap_or_default()
+    );
+
+    allowed_origins.iter().any(|allowed| {
+        // Support wildcard subdomains (e.g., "*.example.com")
+        if allowed.starts_with("*.") {
+            let domain = &allowed[1..]; // ".example.com"
+            url.host_str()
+                .is_some_and(|host| host.ends_with(domain) || host == &domain[1..])
+        } else {
+            &redirect_origin == allowed
+        }
+    })
+}
+
 /// Check if auth is enabled
 pub async fn auth_status(State(state): State<AppState>) -> impl IntoResponse {
     #[derive(Serialize)]
@@ -164,8 +198,19 @@ pub async fn login(
         AuthErrorResponse::new("oidc_not_configured", "OIDC authentication is not configured")
     })?;
 
-    // Generate authorization state
-    let auth_state = AuthorizationState::new();
+    // Validate redirect_uri if provided (prevent open redirect)
+    if let Some(ref redirect_uri) = params.redirect_uri {
+        if !is_valid_redirect_uri(redirect_uri, &state.config.allowed_redirect_origins) {
+            warn!(redirect_uri = %redirect_uri, "Invalid redirect URI rejected");
+            return Err(AuthErrorResponse::new(
+                "invalid_redirect_uri",
+                "The provided redirect URI is not allowed",
+            ));
+        }
+    }
+
+    // Generate authorization state with redirect URI
+    let auth_state = AuthorizationState::with_redirect_uri(params.redirect_uri.clone());
     let state_token = auth_state.state.clone();
 
     // Build authorization URL
@@ -174,13 +219,17 @@ pub async fn login(
         AuthErrorResponse::new("server_error", "Failed to initiate authentication")
     })?;
 
-    // Store state for callback validation
-    {
-        let mut store = state.auth_state_store.write().await;
-        store.insert(state_token, auth_state);
-    }
+    // Store state for callback validation using the database-backed store
+    state.auth_state_store.store(&auth_state).await.map_err(|e| {
+        error!("Failed to store auth state: {}", e);
+        AuthErrorResponse::new("server_error", "Failed to initiate authentication")
+    })?;
 
-    info!(redirect_uri = ?params.redirect_uri, "Initiating OIDC login");
+    info!(
+        state = %state_token,
+        redirect_uri = ?params.redirect_uri,
+        "Initiating OIDC login"
+    );
 
     Ok(Json(LoginResponse { auth_url }))
 }
@@ -199,19 +248,23 @@ pub async fn callback(
         return Err(AuthErrorResponse::new(error, description));
     }
 
-    // Validate state
-    let auth_state = {
-        let mut store = state.auth_state_store.write().await;
-        store.remove(&params.state)
-    };
+    // Validate state and retrieve from database (atomic take operation)
+    let auth_state = state
+        .auth_state_store
+        .take(&params.state)
+        .await
+        .map_err(|e| {
+            error!("Failed to retrieve auth state: {}", e);
+            AuthErrorResponse::new("server_error", "Failed to validate state")
+        })?;
 
     let auth_state = auth_state.ok_or_else(|| {
         warn!("Invalid or expired state parameter");
         AuthErrorResponse::new("invalid_state", "Invalid or expired state parameter")
     })?;
 
-    // Check if state is expired (10 minutes)
-    if auth_state.is_expired(600) {
+    // Check if state is expired
+    if auth_state.is_expired(AUTH_STATE_EXPIRATION_SECS) {
         warn!("Authorization state expired");
         return Err(AuthErrorResponse::new(
             "state_expired",
@@ -230,10 +283,12 @@ pub async fn callback(
         AuthErrorResponse::new("server_error", "Token endpoint not available")
     })?;
 
-    let token_params = oidc.token_request_params(&params.code, &auth_state).map_err(|e| {
-        error!("Failed to build token request: {}", e);
-        AuthErrorResponse::new("server_error", "Failed to build token request")
-    })?;
+    let token_params = oidc
+        .token_request_params(&params.code, &auth_state)
+        .map_err(|e| {
+            error!("Failed to build token request: {}", e);
+            AuthErrorResponse::new("server_error", "Failed to build token request")
+        })?;
 
     // Make token request
     let client = reqwest::Client::new();
@@ -249,8 +304,8 @@ pub async fn callback(
 
     if !token_response.status().is_success() {
         let status = token_response.status();
-        let body = token_response.text().await.unwrap_or_default();
-        error!(status = %status, body = %body, "Token endpoint returned error");
+        // Don't log the full body as it may contain sensitive information
+        error!(status = %status, "Token endpoint returned error");
         return Err(AuthErrorResponse::new(
             "token_error",
             "Token endpoint returned an error",
@@ -319,6 +374,7 @@ pub async fn callback(
         token_type: "Bearer".to_string(),
         expires_in: state.config.jwt_expiration_hours * 3600,
         refresh_token: tokens.refresh_token,
+        redirect_uri: auth_state.redirect_uri,
     }))
 }
 
@@ -365,6 +421,7 @@ pub async fn refresh_token(
         token_type: "Bearer".to_string(),
         expires_in: state.config.jwt_expiration_hours * 3600,
         refresh_token: None,
+        redirect_uri: None,
     }))
 }
 
@@ -416,4 +473,66 @@ pub async fn logout() -> impl IntoResponse {
         success: true,
         message: "Logged out successfully. Please discard your tokens.".to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_relative_paths() {
+        let allowed: Vec<String> = vec![];
+
+        // Valid relative paths
+        assert!(is_valid_redirect_uri("/dashboard", &allowed));
+        assert!(is_valid_redirect_uri("/auth/callback", &allowed));
+        assert!(is_valid_redirect_uri("/path?query=value", &allowed));
+
+        // Invalid paths (protocol-relative or absolute)
+        assert!(!is_valid_redirect_uri("//evil.com/path", &allowed));
+        assert!(!is_valid_redirect_uri("https://evil.com", &allowed));
+    }
+
+    #[test]
+    fn test_validate_allowed_origins() {
+        let allowed = vec![
+            "https://app.example.com".to_string(),
+            "https://localhost:3000".to_string(),
+        ];
+
+        // Valid origins
+        assert!(is_valid_redirect_uri(
+            "https://app.example.com/callback",
+            &allowed
+        ));
+        assert!(is_valid_redirect_uri(
+            "https://localhost:3000/auth",
+            &allowed
+        ));
+
+        // Invalid origins
+        assert!(!is_valid_redirect_uri("https://evil.com/callback", &allowed));
+        assert!(!is_valid_redirect_uri(
+            "https://app.example.com.evil.com",
+            &allowed
+        ));
+    }
+
+    #[test]
+    fn test_validate_wildcard_subdomains() {
+        let allowed = vec!["*.example.com".to_string()];
+
+        // Valid subdomains
+        assert!(is_valid_redirect_uri(
+            "https://app.example.com/callback",
+            &allowed
+        ));
+        assert!(is_valid_redirect_uri(
+            "https://staging.example.com/auth",
+            &allowed
+        ));
+
+        // Invalid (not a subdomain)
+        assert!(!is_valid_redirect_uri("https://example.org", &allowed));
+    }
 }

@@ -50,9 +50,11 @@
 mod error;
 mod jwt;
 mod oidc;
+mod state_store;
 mod user;
 
 pub use error::*;
 pub use jwt::*;
 pub use oidc::*;
+pub use state_store::*;
 pub use user::*;

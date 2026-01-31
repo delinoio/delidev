@@ -12,7 +12,7 @@ pub mod state;
 pub mod websocket;
 pub mod worker_registry;
 
-pub use auth_routes::AuthStateStore;
+pub use auth::AuthStateStore;
 pub use config::ServerConfig;
 pub use log_broadcaster::LogBroadcaster;
 pub use rpc::dispatch_method;

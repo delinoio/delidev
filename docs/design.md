@@ -806,6 +806,15 @@ The server supports OIDC for user authentication with any standard OIDC provider
 | `DELIDEV_OIDC_CLIENT_SECRET` | OAuth2 client secret |
 | `DELIDEV_OIDC_REDIRECT_URL` | Redirect URL after authentication |
 | `DELIDEV_OIDC_SCOPES` | Comma-separated scopes (default: `openid,email,profile`) |
+| `DELIDEV_ALLOWED_REDIRECT_ORIGINS` | Comma-separated list of allowed redirect origins (supports wildcards like `*.example.com`) |
+
+**Security Features:**
+
+- **PKCE (Proof Key for Code Exchange)**: S256 challenge method for enhanced security
+- **CSRF Protection**: State parameter validation with automatic expiration (10 minutes)
+- **Database-backed State Storage**: Authorization states are stored in PostgreSQL (multi-user) or SQLite (single-user) for production reliability
+- **Redirect URI Validation**: Prevents open redirect vulnerabilities by validating against an allowlist
+- **Timeout Protection**: OIDC metadata discovery has a 30-second timeout to prevent startup hangs
 
 **Authentication Flow:**
 

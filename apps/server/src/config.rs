@@ -43,6 +43,12 @@ pub struct ServerConfig {
     #[serde(default)]
     pub cors_origins: Vec<String>,
 
+    /// Allowed redirect origins for OIDC (prevents open redirect attacks)
+    /// Supports wildcard subdomains (e.g., "*.example.com")
+    /// If empty, only relative paths are allowed
+    #[serde(default)]
+    pub allowed_redirect_origins: Vec<String>,
+
     /// Worker heartbeat timeout in seconds
     #[serde(default = "default_worker_heartbeat_timeout")]
     pub worker_heartbeat_timeout_secs: u64,
@@ -132,6 +138,7 @@ impl Default for ServerConfig {
             jwt_issuer: default_jwt_issuer(),
             enable_cors: default_enable_cors(),
             cors_origins: Vec::new(),
+            allowed_redirect_origins: Vec::new(),
             worker_heartbeat_timeout_secs: default_worker_heartbeat_timeout(),
             log_level: default_log_level(),
             oidc: None,
@@ -179,6 +186,11 @@ impl ServerConfig {
 
         if let Ok(origins) = std::env::var("DELIDEV_CORS_ORIGINS") {
             config.cors_origins = origins.split(',').map(|s| s.trim().to_string()).collect();
+        }
+
+        if let Ok(origins) = std::env::var("DELIDEV_ALLOWED_REDIRECT_ORIGINS") {
+            config.allowed_redirect_origins =
+                origins.split(',').map(|s| s.trim().to_string()).collect();
         }
 
         if let Ok(timeout) = std::env::var("DELIDEV_WORKER_HEARTBEAT_TIMEOUT") {
@@ -230,6 +242,9 @@ impl ServerConfig {
                     }
                     if config.cors_origins.is_empty() {
                         config.cors_origins = file_config.cors_origins;
+                    }
+                    if config.allowed_redirect_origins.is_empty() {
+                        config.allowed_redirect_origins = file_config.allowed_redirect_origins;
                     }
                 }
             }
