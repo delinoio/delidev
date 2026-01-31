@@ -1,8 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "apps/tauri-app/src-tauri",
-]
+members = ["apps/main-server", "apps/tauri-app/src-tauri", "apps/worker-server"]
 
 # Release profile optimizations
 [profile.release]
