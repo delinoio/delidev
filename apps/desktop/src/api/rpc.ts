@@ -378,6 +378,50 @@ export class JsonRpcClient {
     };
   }
 
+  // ========== SSE Subscriptions ==========
+
+  /**
+   * Subscribes to execution logs for a task using Server-Sent Events (SSE)
+   * SSE is preferred over WebSocket for one-way streaming as it's simpler
+   * and handles reconnection automatically.
+   */
+  subscribeExecutionLogsSSE<T>(
+    taskId: string,
+    callback: SubscriptionCallback<T>,
+    onError?: (error: Event) => void
+  ): Subscription {
+    const sseUrl = `${this.serverUrl}/events/${taskId}`;
+
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.addEventListener("log", (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data) as T;
+        callback(data);
+      } catch (error) {
+        console.error("[RPC] Failed to parse SSE message:", error);
+      }
+    });
+
+    eventSource.onerror = (error) => {
+      console.error("[RPC] SSE error:", error);
+      if (onError) {
+        onError(error);
+      }
+    };
+
+    eventSource.onopen = () => {
+      console.log("[RPC] SSE connected for task:", taskId);
+    };
+
+    return {
+      unsubscribe: () => {
+        eventSource.close();
+        console.log("[RPC] SSE disconnected for task:", taskId);
+      },
+    };
+  }
+
   /**
    * Subscribes to task status changes
    */

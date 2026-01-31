@@ -262,6 +262,7 @@ In single-process mode, the desktop app embeds all components (server + worker) 
 | tokio | Async runtime |
 | axum | Web server framework |
 | jsonwebtoken | JWT authentication |
+| redis | Redis client for distributed event streaming |
 
 ### Shared Crates
 
@@ -300,6 +301,45 @@ The frontend includes a flexible API layer that supports both single-process mod
 - **Remote Mode**: Uses JSON-RPC over HTTP/WebSocket to communicate with remote server.
 
 The hooks automatically detect the current mode and route API calls appropriately.
+
+### Event Streaming
+
+DeliDev supports real-time event streaming for execution logs and task status updates.
+
+**Streaming Methods:**
+
+| Method | Protocol | Use Case |
+|--------|----------|----------|
+| SSE | HTTP `/events/{task_id}` | Preferred for one-way log streaming |
+| WebSocket | WS `/ws` | Bidirectional communication, subscriptions |
+
+**Redis PubSub (Distributed Mode):**
+
+When running in distributed mode with multiple workers, Redis PubSub is used to distribute logs:
+
+```
+┌────────────────┐      ┌─────────────────┐      ┌────────────────┐
+│  Worker 1      │      │      Redis      │      │    Server      │
+│  (publishes)   │─────►│  PubSub Broker  │◄────►│  (subscribes)  │
+└────────────────┘      └─────────────────┘      └───────┬────────┘
+                                                         │
+┌────────────────┐                                       │
+│  Worker 2      │─────────────────────────────────────►│
+│  (publishes)   │                                       │
+└────────────────┘                              ┌────────▼────────┐
+                                               │   SSE / WS      │
+                                               │   Clients       │
+                                               └─────────────────┘
+```
+
+**Configuration:**
+
+| Environment Variable | Description |
+|---------------------|-------------|
+| `DELIDEV_REDIS_URL` | Redis connection URL (e.g., `redis://localhost:6379`) |
+
+**Channel Naming:**
+- Task logs: `delidev:task:{task_id}:logs`
 
 ### Supported Platforms
 - Windows (x64, arm64)

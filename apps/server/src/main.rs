@@ -3,7 +3,8 @@
 //! The main server handles:
 //! - Task management (UnitTask, CompositeTask)
 //! - Worker coordination and assignment
-//! - Real-time log streaming via WebSocket
+//! - Real-time log streaming via WebSocket and SSE
+//! - Redis PubSub for distributed event streaming
 //! - User authentication (in multi-user mode)
 
 use std::time::Duration;
@@ -25,7 +26,9 @@ mod auth_routes;
 mod config;
 mod log_broadcaster;
 mod middleware;
+mod redis_broadcaster;
 mod rpc;
+mod sse;
 mod state;
 mod websocket;
 mod worker_registry;
@@ -103,6 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let protected_routes = Router::new()
         .route("/rpc", post(rpc::handle_rpc))
         .route("/ws", get(websocket::handle_websocket))
+        .route("/events/{task_id}", get(sse::handle_sse))
         .route_layer(axum_middleware::from_fn_with_state(
             state.clone(),
             middleware::auth_middleware,

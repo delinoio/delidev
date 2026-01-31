@@ -11,7 +11,8 @@ use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
 use crate::{
-    config::ServerConfig, log_broadcaster::LogBroadcaster, worker_registry::WorkerRegistry,
+    config::ServerConfig, log_broadcaster::LogBroadcaster,
+    redis_broadcaster::RedisBroadcaster, worker_registry::WorkerRegistry,
 };
 
 /// Default timeout for OIDC metadata discovery (30 seconds)
@@ -44,6 +45,10 @@ pub struct AppState {
     /// Secret store for tasks (task_id -> secrets)
     /// Note: Secrets are stored temporarily and cleared after task completion
     pub secret_store: Arc<RwLock<TaskSecretStore>>,
+
+    /// Redis broadcaster for distributed log streaming (optional)
+    /// When configured, enables Redis PubSub for multi-worker setups
+    pub redis_broadcaster: Option<RedisBroadcaster>,
 }
 
 /// Stores secrets for tasks temporarily until they are consumed by workers
@@ -207,6 +212,26 @@ impl AppState {
         // Initialize secret store
         let secret_store = Arc::new(RwLock::new(TaskSecretStore::new()));
 
+        // Initialize Redis broadcaster if configured
+        let redis_broadcaster = if let Some(ref redis_url) = config.redis_url {
+            let broadcaster = RedisBroadcaster::new(redis_url);
+            match broadcaster.connect().await {
+                Ok(()) => {
+                    tracing::info!("Redis broadcaster connected for event streaming");
+                    Some(broadcaster)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "Failed to connect Redis broadcaster, falling back to in-memory"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             store,
             auth,
@@ -216,6 +241,7 @@ impl AppState {
             log_broadcaster,
             config: Arc::new(config),
             secret_store,
+            redis_broadcaster,
         })
     }
 }

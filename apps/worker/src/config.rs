@@ -42,6 +42,12 @@ pub struct WorkerConfig {
     /// Log level
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    /// Redis URL for event streaming (optional)
+    /// When set, enables publishing logs directly to Redis
+    /// Example: "redis://localhost:6379"
+    #[serde(default)]
+    pub redis_url: Option<String>,
 }
 
 fn default_server_url() -> String {
@@ -88,6 +94,7 @@ impl Default for WorkerConfig {
             use_container: default_use_container(),
             worktree_dir: default_worktree_dir(),
             log_level: default_log_level(),
+            redis_url: None,
         }
     }
 }
@@ -136,6 +143,10 @@ impl WorkerConfig {
 
         if let Ok(level) = std::env::var("DELIDEV_LOG_LEVEL") {
             config.log_level = level;
+        }
+
+        if let Ok(redis_url) = std::env::var("DELIDEV_REDIS_URL") {
+            config.redis_url = Some(redis_url);
         }
 
         // Try to load from config file

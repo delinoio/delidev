@@ -45,5 +45,8 @@ dirs = "6"
 # CPU count
 num_cpus = "1"
 
+# Redis (for event streaming - publishing logs directly to Redis)
+redis = { version = "0.27", features = ["tokio-comp", "aio", "connection-manager"] }
+
 [dev-dependencies]
 tokio-test = "0.4"

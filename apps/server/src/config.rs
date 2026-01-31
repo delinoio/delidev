@@ -60,6 +60,12 @@ pub struct ServerConfig {
     /// OIDC configuration (optional, for OpenID Connect authentication)
     #[serde(default)]
     pub oidc: Option<OidcServerConfig>,
+
+    /// Redis URL for event streaming (optional)
+    /// When set, enables Redis PubSub for distributed log streaming
+    /// Example: "redis://localhost:6379"
+    #[serde(default)]
+    pub redis_url: Option<String>,
 }
 
 /// OIDC configuration for the server
@@ -142,6 +148,7 @@ impl Default for ServerConfig {
             worker_heartbeat_timeout_secs: default_worker_heartbeat_timeout(),
             log_level: default_log_level(),
             oidc: None,
+            redis_url: None,
         }
     }
 }
@@ -223,6 +230,11 @@ impl ServerConfig {
                 redirect_url,
                 scopes,
             });
+        }
+
+        // Load Redis URL from environment
+        if let Ok(redis_url) = std::env::var("DELIDEV_REDIS_URL") {
+            config.redis_url = Some(redis_url);
         }
 
         // Try to load from config file

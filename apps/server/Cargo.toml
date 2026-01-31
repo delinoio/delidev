@@ -57,5 +57,12 @@ tokio-util = { version = "0.7" }
 # Futures
 futures-util = "0.3"
 
+# Redis (for event streaming)
+redis = { version = "0.27", features = ["tokio-comp", "aio", "connection-manager"] }
+
+# Async streams
+async-stream = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
