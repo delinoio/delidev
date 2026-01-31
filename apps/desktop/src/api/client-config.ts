@@ -109,6 +109,9 @@ export async function initializeClient(): Promise<void> {
   const config = getStoredConfig();
 
   if (config.mode === "remote" && config.serverUrl) {
+    // Notify Tauri backend of mode change
+    await invoke("set_server_mode", { mode: "remote", serverUrl: config.serverUrl });
+
     // Initialize RPC client for remote mode
     initRpcClient({
       serverUrl: config.serverUrl,
@@ -120,6 +123,9 @@ export async function initializeClient(): Promise<void> {
       serverUrl: config.serverUrl,
     });
   } else {
+    // Notify Tauri backend of mode change
+    await invoke("set_server_mode", { mode: "single_process", serverUrl: null });
+
     // Reset to single process mode
     resetRpcClient();
     setClientMode({ mode: "single_process" });
@@ -134,6 +140,9 @@ export async function switchToRemoteMode(serverUrl: string): Promise<void> {
   if (!serverUrl.startsWith("http://") && !serverUrl.startsWith("https://")) {
     throw new Error("Server URL must start with http:// or https://");
   }
+
+  // Notify Tauri backend of mode change
+  await invoke("set_server_mode", { mode: "remote", serverUrl });
 
   // Save configuration
   saveConfig({ mode: "remote", serverUrl });
@@ -152,6 +161,9 @@ export async function switchToRemoteMode(serverUrl: string): Promise<void> {
  * Switches to single process mode
  */
 export async function switchToSingleProcessMode(): Promise<void> {
+  // Notify Tauri backend of mode change
+  await invoke("set_server_mode", { mode: "single_process", serverUrl: null });
+
   // Save configuration
   saveConfig({ mode: "single_process" });
 
