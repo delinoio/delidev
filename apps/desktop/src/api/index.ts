@@ -129,6 +129,18 @@ export async function addRepository(path: string): Promise<Repository> {
   return invoke("add_repository", { path });
 }
 
+/**
+ * Adds a repository by remote URL (for server mode)
+ * This is used when the desktop app is connected to a remote server
+ * and local paths are not available
+ */
+export async function addRepositoryByUrl(
+  remoteUrl: string,
+  defaultBranch?: string
+): Promise<Repository> {
+  return invoke("add_repository_by_url", { remoteUrl, defaultBranch });
+}
+
 export async function removeRepository(id: string): Promise<void> {
   return invoke("remove_repository", { id });
 }

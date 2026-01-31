@@ -110,6 +110,17 @@ impl RepositoryService {
         Ok(count > 0)
     }
 
+    /// Checks if a remote URL is already registered
+    pub async fn exists_by_remote_url(&self, remote_url: &str) -> DatabaseResult<bool> {
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM repositories WHERE remote_url = ?")
+                .bind(remote_url)
+                .fetch_one(self.db.pool())
+                .await?;
+
+        Ok(count > 0)
+    }
+
     /// Detects repository info from local path
     pub fn detect_from_path(path: &Path) -> Option<(String, String, VCSProviderType)> {
         let repo = git2::Repository::open(path).ok()?;

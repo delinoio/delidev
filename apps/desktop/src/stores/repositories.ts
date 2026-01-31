@@ -16,6 +16,7 @@ interface RepositoriesState {
   // Actions
   fetchRepositories: () => Promise<void>;
   addRepository: (path: string) => Promise<Repository>;
+  addRepositoryByUrl: (remoteUrl: string, defaultBranch?: string) => Promise<Repository>;
   removeRepository: (id: string) => Promise<void>;
   selectRepository: (id: string | null) => void;
   clearError: () => void;
@@ -55,6 +56,23 @@ export const useRepositoriesStore = create<RepositoriesState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const repository = await api.addRepository(path);
+      set((state) => ({
+        repositories: [...state.repositories, repository],
+        isLoading: false,
+      }));
+      return repository;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to add repository";
+      set({ error: message, isLoading: false });
+      throw new Error(message);
+    }
+  },
+
+  addRepositoryByUrl: async (remoteUrl: string, defaultBranch?: string) => {
+    try {
+      set({ isLoading: true, error: null });
+      const repository = await api.addRepositoryByUrl(remoteUrl, defaultBranch);
       set((state) => ({
         repositories: [...state.repositories, repository],
         isLoading: false,

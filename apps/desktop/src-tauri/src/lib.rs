@@ -64,6 +64,7 @@ pub fn run() {
             commands::list_repositories,
             commands::get_repository,
             commands::add_repository,
+            commands::add_repository_by_url,
             commands::remove_repository,
             commands::validate_repository_path,
             commands::list_repository_files,

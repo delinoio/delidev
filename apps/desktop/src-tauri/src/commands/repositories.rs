@@ -89,6 +89,79 @@ pub async fn remove_repository(state: State<'_, Arc<AppState>>, id: String) -> R
         .map_err(|e| e.to_string())
 }
 
+/// Adds a repository from a remote URL (for server mode)
+/// This is used when the desktop app is connected to a remote server
+/// and local paths are not available
+#[tauri::command]
+pub async fn add_repository_by_url(
+    state: State<'_, Arc<AppState>>,
+    remote_url: String,
+    default_branch: Option<String>,
+) -> Result<Repository, String> {
+    // Parse repository info from URL
+    let (name, provider) = parse_repository_url(&remote_url)?;
+
+    // Check if already registered by remote URL
+    if state
+        .repository_service
+        .exists_by_remote_url(&remote_url)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        return Err("Repository already registered".to_string());
+    }
+
+    let repo = Repository::new(
+        uuid::Uuid::new_v4().to_string(),
+        name,
+        String::new(), // Empty local path for server mode
+        remote_url,
+        provider,
+    )
+    .with_default_branch(default_branch.unwrap_or_else(|| "main".to_string()));
+
+    state
+        .repository_service
+        .create(&repo)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(repo)
+}
+
+/// Parses a git repository URL and extracts name and provider
+fn parse_repository_url(url: &str) -> Result<(String, VCSProviderType), String> {
+    // Detect provider from URL
+    let provider = Repository::detect_provider_from_url(url).ok_or(
+        "Could not detect VCS provider from URL. Supported providers: GitHub, GitLab, Bitbucket",
+    )?;
+
+    // Extract repo name from URL
+    // Handles formats like:
+    // - https://github.com/owner/repo.git
+    // - https://github.com/owner/repo
+    // - git@github.com:owner/repo.git
+    let name = url
+        .trim_end_matches(".git")
+        .split('/')
+        .next_back()
+        .or_else(|| {
+            // Handle SSH format: git@github.com:owner/repo.git
+            url.trim_end_matches(".git")
+                .split(':')
+                .next_back()
+                .and_then(|s| s.split('/').next_back())
+        })
+        .ok_or("Could not extract repository name from URL")?
+        .to_string();
+
+    if name.is_empty() {
+        return Err("Could not extract repository name from URL".to_string());
+    }
+
+    Ok((name, provider))
+}
+
 /// Validates if a path is a valid git repository
 #[tauri::command]
 pub fn validate_repository_path(path: String) -> Result<RepositoryInfo, String> {

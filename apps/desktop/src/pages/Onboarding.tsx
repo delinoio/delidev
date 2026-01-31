@@ -12,10 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Loader2, Check, FolderGit2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Loader2, Check, FolderGit2, ArrowRight, ArrowLeft, Link } from "lucide-react";
 import { VCSProviderType } from "../types";
 import { useConfigStore } from "../stores/config";
 import { useRepositoriesStore } from "../stores/repositories";
+import { getClientMode } from "../api/hooks";
 
 const vcsProviderOptions = [
   { value: VCSProviderType.GitHub, label: "GitHub" },
@@ -47,7 +48,10 @@ export function Onboarding() {
     fetchCredentialsStatus,
     credentialsStatus,
   } = useConfigStore();
-  const { addRepository } = useRepositoriesStore();
+  const { addRepository, addRepositoryByUrl } = useRepositoriesStore();
+
+  // Check if we're in server/remote mode
+  const isServerMode = getClientMode() === "remote";
 
   const [step, setStep] = useState(1);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -89,7 +93,10 @@ export function Onboarding() {
 
   // Step 2 state
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [repositoryUrl, setRepositoryUrl] = useState("");
+  const [defaultBranch, setDefaultBranch] = useState("main");
   const [isAddingRepo, setIsAddingRepo] = useState(false);
+  const [addRepoError, setAddRepoError] = useState<string | null>(null);
   const [repoInfo, setRepoInfo] = useState<{
     name: string;
     remote: string;
@@ -145,14 +152,22 @@ export function Onboarding() {
   };
 
   const handleAddRepository = async () => {
-    if (!selectedPath) return;
-
     setIsAddingRepo(true);
+    setAddRepoError(null);
     try {
-      await addRepository(selectedPath);
+      if (isServerMode) {
+        // In server mode, use URL-based registration
+        if (!repositoryUrl) return;
+        await addRepositoryByUrl(repositoryUrl, defaultBranch);
+      } else {
+        // In local mode, use path-based registration
+        if (!selectedPath) return;
+        await addRepository(selectedPath);
+      }
       navigate("/");
     } catch (error) {
       console.error("Failed to add repository:", error);
+      setAddRepoError(error instanceof Error ? error.message : "Failed to add repository");
     } finally {
       setIsAddingRepo(false);
     }
@@ -304,31 +319,92 @@ export function Onboarding() {
               <div>
                 <h3 className="font-medium mb-2">Add Your First Repository</h3>
                 <p className="text-sm text-muted-foreground">
-                  Select a local git repository to get started.
+                  {isServerMode
+                    ? "Enter a git repository URL to get started."
+                    : "Select a local git repository to get started."}
                 </p>
               </div>
 
-              <div
-                className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={handleSelectRepository}
-              >
-                {selectedPath ? (
+              {isServerMode ? (
+                // Server mode: URL input
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <FolderGit2 className="h-12 w-12 mx-auto text-primary" />
-                    <p className="font-medium">{repoInfo?.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedPath}
+                    <Label htmlFor="repo-url">Repository URL</Label>
+                    <Input
+                      id="repo-url"
+                      type="url"
+                      value={repositoryUrl}
+                      onChange={(e) => {
+                        setRepositoryUrl(e.target.value);
+                        setAddRepoError(null);
+                      }}
+                      placeholder="https://github.com/owner/repo"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the HTTPS or SSH URL of your git repository
                     </p>
                   </div>
-                ) : (
+
                   <div className="space-y-2">
-                    <FolderGit2 className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Click to select a repository folder
+                    <Label htmlFor="default-branch">Default Branch</Label>
+                    <Input
+                      id="default-branch"
+                      type="text"
+                      value={defaultBranch}
+                      onChange={(e) => setDefaultBranch(e.target.value)}
+                      placeholder="main"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The main branch of your repository (usually main or master)
                     </p>
                   </div>
-                )}
-              </div>
+
+                  {repositoryUrl && (
+                    <div className="rounded-lg border p-4">
+                      <div className="flex items-center gap-3">
+                        <Link className="h-8 w-8 text-primary" />
+                        <div>
+                          <p className="font-medium">
+                            {repositoryUrl.split("/").pop()?.replace(".git", "") || "Repository"}
+                          </p>
+                          <p className="text-sm text-muted-foreground truncate max-w-[300px]">
+                            {repositoryUrl}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Local mode: Folder picker
+                <div
+                  className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={handleSelectRepository}
+                >
+                  {selectedPath ? (
+                    <div className="space-y-2">
+                      <FolderGit2 className="h-12 w-12 mx-auto text-primary" />
+                      <p className="font-medium">{repoInfo?.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedPath}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <FolderGit2 className="h-12 w-12 mx-auto text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Click to select a repository folder
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {addRepoError && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                  <p className="text-sm text-destructive">{addRepoError}</p>
+                </div>
+              )}
 
               <p className="text-xs text-muted-foreground text-center">
                 You can add more repositories later from Repository Management.
@@ -345,7 +421,9 @@ export function Onboarding() {
                   </Button>
                   <Button
                     onClick={handleAddRepository}
-                    disabled={!selectedPath || isAddingRepo}
+                    disabled={
+                      (isServerMode ? !repositoryUrl : !selectedPath) || isAddingRepo
+                    }
                   >
                     {isAddingRepo ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
