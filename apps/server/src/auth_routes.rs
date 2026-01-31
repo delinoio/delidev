@@ -1,0 +1,419 @@
+//! Authentication route handlers
+//!
+//! This module provides REST endpoints for authentication:
+//! - `/auth/login` - Initiate OIDC login
+//! - `/auth/callback` - OIDC callback handler
+//! - `/auth/token` - Token refresh
+//! - `/auth/logout` - Logout (client-side token invalidation)
+//! - `/auth/me` - Get current user info
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use auth::{AuthenticatedUser, AuthorizationState, JwtAuth, TokenResponse, UserInfo};
+use axum::{
+    extract::{Query, State},
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
+
+use crate::state::AppState;
+
+/// In-memory storage for authorization states (would use Redis/database in production)
+pub type AuthStateStore = Arc<RwLock<HashMap<String, AuthorizationState>>>;
+
+/// Create a new auth state store
+pub fn create_auth_state_store() -> AuthStateStore {
+    Arc::new(RwLock::new(HashMap::new()))
+}
+
+/// Login request (for initiating OIDC flow)
+#[derive(Debug, Deserialize)]
+pub struct LoginRequest {
+    /// Optional redirect URL after successful login
+    #[serde(default)]
+    pub redirect_uri: Option<String>,
+}
+
+/// Login response
+#[derive(Debug, Serialize)]
+pub struct LoginResponse {
+    /// URL to redirect to for authentication
+    pub auth_url: String,
+}
+
+/// Callback query parameters
+#[derive(Debug, Deserialize)]
+pub struct CallbackParams {
+    /// Authorization code from OIDC provider
+    pub code: String,
+
+    /// State parameter for CSRF protection
+    pub state: String,
+
+    /// Optional error from provider
+    #[serde(default)]
+    pub error: Option<String>,
+
+    /// Optional error description
+    #[serde(default)]
+    pub error_description: Option<String>,
+}
+
+/// Token response to client
+#[derive(Debug, Serialize)]
+pub struct AuthTokenResponse {
+    /// JWT access token
+    pub access_token: String,
+
+    /// Token type (always "Bearer")
+    pub token_type: String,
+
+    /// When the token expires (in seconds)
+    pub expires_in: i64,
+
+    /// Refresh token (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+}
+
+/// Token refresh request
+#[derive(Debug, Deserialize)]
+pub struct RefreshTokenRequest {
+    /// The refresh token
+    pub refresh_token: String,
+}
+
+/// Current user response
+#[derive(Debug, Serialize)]
+pub struct CurrentUserResponse {
+    /// User ID
+    pub id: String,
+
+    /// Email address
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+
+    /// Display name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+impl From<AuthenticatedUser> for CurrentUserResponse {
+    fn from(user: AuthenticatedUser) -> Self {
+        Self {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+        }
+    }
+}
+
+/// Error response
+#[derive(Debug, Serialize)]
+pub struct AuthErrorResponse {
+    /// Error code
+    pub error: String,
+
+    /// Human-readable error description
+    pub error_description: String,
+}
+
+impl AuthErrorResponse {
+    pub fn new(error: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            error: error.into(),
+            error_description: description.into(),
+        }
+    }
+}
+
+impl IntoResponse for AuthErrorResponse {
+    fn into_response(self) -> Response {
+        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+    }
+}
+
+/// Check if auth is enabled
+pub async fn auth_status(State(state): State<AppState>) -> impl IntoResponse {
+    #[derive(Serialize)]
+    struct AuthStatus {
+        enabled: bool,
+        oidc_enabled: bool,
+    }
+
+    let status = AuthStatus {
+        enabled: state.auth.is_some(),
+        oidc_enabled: state.oidc.is_some(),
+    };
+
+    Json(status)
+}
+
+/// Initiate OIDC login
+pub async fn login(
+    State(state): State<AppState>,
+    Query(params): Query<LoginRequest>,
+) -> Result<impl IntoResponse, AuthErrorResponse> {
+    // Check if OIDC is configured
+    let oidc = state.oidc.as_ref().ok_or_else(|| {
+        AuthErrorResponse::new("oidc_not_configured", "OIDC authentication is not configured")
+    })?;
+
+    // Generate authorization state
+    let auth_state = AuthorizationState::new();
+    let state_token = auth_state.state.clone();
+
+    // Build authorization URL
+    let auth_url = oidc.authorization_url(&auth_state).map_err(|e| {
+        error!("Failed to build authorization URL: {}", e);
+        AuthErrorResponse::new("server_error", "Failed to initiate authentication")
+    })?;
+
+    // Store state for callback validation
+    {
+        let mut store = state.auth_state_store.write().await;
+        store.insert(state_token, auth_state);
+    }
+
+    info!(redirect_uri = ?params.redirect_uri, "Initiating OIDC login");
+
+    Ok(Json(LoginResponse { auth_url }))
+}
+
+/// Handle OIDC callback
+pub async fn callback(
+    State(state): State<AppState>,
+    Query(params): Query<CallbackParams>,
+) -> Result<impl IntoResponse, AuthErrorResponse> {
+    // Check for error from provider
+    if let Some(error) = params.error {
+        let description = params
+            .error_description
+            .unwrap_or_else(|| "Authentication failed".to_string());
+        warn!(error = %error, description = %description, "OIDC error");
+        return Err(AuthErrorResponse::new(error, description));
+    }
+
+    // Validate state
+    let auth_state = {
+        let mut store = state.auth_state_store.write().await;
+        store.remove(&params.state)
+    };
+
+    let auth_state = auth_state.ok_or_else(|| {
+        warn!("Invalid or expired state parameter");
+        AuthErrorResponse::new("invalid_state", "Invalid or expired state parameter")
+    })?;
+
+    // Check if state is expired (10 minutes)
+    if auth_state.is_expired(600) {
+        warn!("Authorization state expired");
+        return Err(AuthErrorResponse::new(
+            "state_expired",
+            "Authorization request has expired",
+        ));
+    }
+
+    // Get OIDC client
+    let oidc = state.oidc.as_ref().ok_or_else(|| {
+        AuthErrorResponse::new("oidc_not_configured", "OIDC authentication is not configured")
+    })?;
+
+    // Exchange code for tokens
+    let token_endpoint = oidc.token_endpoint().map_err(|e| {
+        error!("Failed to get token endpoint: {}", e);
+        AuthErrorResponse::new("server_error", "Token endpoint not available")
+    })?;
+
+    let token_params = oidc.token_request_params(&params.code, &auth_state).map_err(|e| {
+        error!("Failed to build token request: {}", e);
+        AuthErrorResponse::new("server_error", "Failed to build token request")
+    })?;
+
+    // Make token request
+    let client = reqwest::Client::new();
+    let token_response = client
+        .post(token_endpoint)
+        .form(&token_params)
+        .send()
+        .await
+        .map_err(|e| {
+            error!("Token request failed: {}", e);
+            AuthErrorResponse::new("token_error", "Failed to exchange authorization code")
+        })?;
+
+    if !token_response.status().is_success() {
+        let status = token_response.status();
+        let body = token_response.text().await.unwrap_or_default();
+        error!(status = %status, body = %body, "Token endpoint returned error");
+        return Err(AuthErrorResponse::new(
+            "token_error",
+            "Token endpoint returned an error",
+        ));
+    }
+
+    let tokens: TokenResponse = token_response.json().await.map_err(|e| {
+        error!("Failed to parse token response: {}", e);
+        AuthErrorResponse::new("token_error", "Invalid token response")
+    })?;
+
+    // Get user info
+    let userinfo_endpoint = oidc.userinfo_endpoint().map_err(|e| {
+        error!("Failed to get userinfo endpoint: {}", e);
+        AuthErrorResponse::new("server_error", "Userinfo endpoint not available")
+    })?;
+
+    let userinfo_response = client
+        .get(userinfo_endpoint)
+        .header("Authorization", format!("Bearer {}", tokens.access_token))
+        .send()
+        .await
+        .map_err(|e| {
+            error!("Userinfo request failed: {}", e);
+            AuthErrorResponse::new("userinfo_error", "Failed to fetch user information")
+        })?;
+
+    if !userinfo_response.status().is_success() {
+        let status = userinfo_response.status();
+        error!(status = %status, "Userinfo endpoint returned error");
+        return Err(AuthErrorResponse::new(
+            "userinfo_error",
+            "Failed to fetch user information",
+        ));
+    }
+
+    let user_info: UserInfo = userinfo_response.json().await.map_err(|e| {
+        error!("Failed to parse userinfo response: {}", e);
+        AuthErrorResponse::new("userinfo_error", "Invalid userinfo response")
+    })?;
+
+    // Convert to authenticated user
+    let user = user_info.to_authenticated_user();
+
+    // Create our own JWT
+    let jwt_auth = state.auth.as_ref().ok_or_else(|| {
+        AuthErrorResponse::new("auth_not_configured", "JWT authentication is not configured")
+    })?;
+
+    let access_token = jwt_auth
+        .create_token_with_expiration(
+            &user.id,
+            user.email.clone(),
+            user.name.clone(),
+            state.config.jwt_expiration_hours,
+        )
+        .map_err(|e| {
+            error!("Failed to create JWT: {}", e);
+            AuthErrorResponse::new("token_error", "Failed to create access token")
+        })?;
+
+    info!(user_id = %user.id, "User authenticated via OIDC");
+
+    Ok(Json(AuthTokenResponse {
+        access_token,
+        token_type: "Bearer".to_string(),
+        expires_in: state.config.jwt_expiration_hours * 3600,
+        refresh_token: tokens.refresh_token,
+    }))
+}
+
+/// Refresh access token
+pub async fn refresh_token(
+    State(state): State<AppState>,
+    Json(params): Json<RefreshTokenRequest>,
+) -> Result<impl IntoResponse, AuthErrorResponse> {
+    let jwt_auth = state.auth.as_ref().ok_or_else(|| {
+        AuthErrorResponse::new("auth_not_configured", "Authentication is not configured")
+    })?;
+
+    // In a full implementation, we would:
+    // 1. Validate the refresh token against a stored list
+    // 2. Check if it's been revoked
+    // 3. Issue a new access token
+    //
+    // For now, we'll use a simple approach where the refresh token
+    // is actually just a longer-lived JWT that we validate and use
+    // to issue a new access token.
+
+    let claims = jwt_auth.verify_token(&params.refresh_token).map_err(|e| {
+        debug!("Refresh token validation failed: {}", e);
+        AuthErrorResponse::new("invalid_token", "Invalid or expired refresh token")
+    })?;
+
+    // Issue new access token
+    let access_token = jwt_auth
+        .create_token_with_expiration(
+            &claims.sub,
+            claims.email,
+            claims.name,
+            state.config.jwt_expiration_hours,
+        )
+        .map_err(|e| {
+            error!("Failed to create JWT: {}", e);
+            AuthErrorResponse::new("token_error", "Failed to create access token")
+        })?;
+
+    info!(user_id = %claims.sub, "Token refreshed");
+
+    Ok(Json(AuthTokenResponse {
+        access_token,
+        token_type: "Bearer".to_string(),
+        expires_in: state.config.jwt_expiration_hours * 3600,
+        refresh_token: None,
+    }))
+}
+
+/// Get current user info
+pub async fn me(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Result<impl IntoResponse, (StatusCode, AuthErrorResponse)> {
+    let jwt_auth = state.auth.as_ref().ok_or_else(|| {
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            AuthErrorResponse::new("auth_not_configured", "Authentication is not configured"),
+        )
+    })?;
+
+    // Extract token from Authorization header
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| JwtAuth::extract_token(h))
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                AuthErrorResponse::new("missing_token", "No authentication token provided"),
+            )
+        })?;
+
+    // Verify token and get user
+    let user = jwt_auth.authenticate(token).map_err(|e| {
+        debug!("Token validation failed: {}", e);
+        (
+            StatusCode::UNAUTHORIZED,
+            AuthErrorResponse::new("invalid_token", "Invalid or expired token"),
+        )
+    })?;
+
+    Ok(Json(CurrentUserResponse::from(user)))
+}
+
+/// Logout (just confirms the action, actual token invalidation is client-side)
+pub async fn logout() -> impl IntoResponse {
+    #[derive(Serialize)]
+    struct LogoutResponse {
+        success: bool,
+        message: String,
+    }
+
+    Json(LogoutResponse {
+        success: true,
+        message: "Logged out successfully. Please discard your tokens.".to_string(),
+    })
+}

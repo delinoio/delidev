@@ -31,6 +31,10 @@ pub struct ServerConfig {
     #[serde(default = "default_jwt_expiration_hours")]
     pub jwt_expiration_hours: i64,
 
+    /// JWT issuer (for token validation)
+    #[serde(default = "default_jwt_issuer")]
+    pub jwt_issuer: String,
+
     /// Whether to enable CORS
     #[serde(default = "default_enable_cors")]
     pub enable_cors: bool,
@@ -46,6 +50,38 @@ pub struct ServerConfig {
     /// Log level (trace, debug, info, warn, error)
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    /// OIDC configuration (optional, for OpenID Connect authentication)
+    #[serde(default)]
+    pub oidc: Option<OidcServerConfig>,
+}
+
+/// OIDC configuration for the server
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OidcServerConfig {
+    /// OIDC provider issuer URL
+    pub issuer_url: String,
+
+    /// OAuth2 client ID
+    pub client_id: String,
+
+    /// OAuth2 client secret
+    pub client_secret: String,
+
+    /// Redirect URL after authentication
+    pub redirect_url: String,
+
+    /// Scopes to request
+    #[serde(default = "default_oidc_scopes")]
+    pub scopes: Vec<String>,
+}
+
+fn default_oidc_scopes() -> Vec<String> {
+    vec![
+        "openid".to_string(),
+        "email".to_string(),
+        "profile".to_string(),
+    ]
 }
 
 fn default_bind_address() -> String {
@@ -66,6 +102,10 @@ fn default_jwt_secret() -> String {
 
 fn default_jwt_expiration_hours() -> i64 {
     24
+}
+
+fn default_jwt_issuer() -> String {
+    "delidev".to_string()
 }
 
 fn default_enable_cors() -> bool {
@@ -89,10 +129,12 @@ impl Default for ServerConfig {
             database_path: default_database_path(),
             jwt_secret: default_jwt_secret(),
             jwt_expiration_hours: default_jwt_expiration_hours(),
+            jwt_issuer: default_jwt_issuer(),
             enable_cors: default_enable_cors(),
             cors_origins: Vec::new(),
             worker_heartbeat_timeout_secs: default_worker_heartbeat_timeout(),
             log_level: default_log_level(),
+            oidc: None,
         }
     }
 }
@@ -145,6 +187,30 @@ impl ServerConfig {
 
         if let Ok(level) = std::env::var("DELIDEV_LOG_LEVEL") {
             config.log_level = level;
+        }
+
+        if let Ok(issuer) = std::env::var("DELIDEV_JWT_ISSUER") {
+            config.jwt_issuer = issuer;
+        }
+
+        // Load OIDC config from environment if all required vars are present
+        if let (Ok(issuer_url), Ok(client_id), Ok(client_secret), Ok(redirect_url)) = (
+            std::env::var("DELIDEV_OIDC_ISSUER_URL"),
+            std::env::var("DELIDEV_OIDC_CLIENT_ID"),
+            std::env::var("DELIDEV_OIDC_CLIENT_SECRET"),
+            std::env::var("DELIDEV_OIDC_REDIRECT_URL"),
+        ) {
+            let scopes = std::env::var("DELIDEV_OIDC_SCOPES")
+                .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_else(|_| default_oidc_scopes());
+
+            config.oidc = Some(OidcServerConfig {
+                issuer_url,
+                client_id,
+                client_secret,
+                redirect_url,
+                scopes,
+            });
         }
 
         // Try to load from config file

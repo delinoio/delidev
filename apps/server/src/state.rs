@@ -4,12 +4,15 @@
 
 use std::sync::Arc;
 
-use auth::JwtAuth;
+use auth::{JwtAuth, OidcAuth, OidcConfig};
 use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
 use crate::{
-    config::ServerConfig, log_broadcaster::LogBroadcaster, worker_registry::WorkerRegistry,
+    auth_routes::AuthStateStore,
+    config::ServerConfig,
+    log_broadcaster::LogBroadcaster,
+    worker_registry::WorkerRegistry,
 };
 
 /// Application state shared across handlers
@@ -20,6 +23,12 @@ pub struct AppState {
 
     /// JWT authentication (None in single-user mode)
     pub auth: Option<Arc<JwtAuth>>,
+
+    /// OIDC authentication client (None if not configured)
+    pub oidc: Option<Arc<OidcAuth>>,
+
+    /// Auth state store for OIDC flow
+    pub auth_state_store: AuthStateStore,
 
     /// Worker registry
     pub worker_registry: Arc<RwLock<WorkerRegistry>>,
@@ -45,12 +54,51 @@ impl AppState {
             Arc::new(MemoryStore::new())
         };
 
-        // Initialize auth (skip in single-user mode)
+        // Initialize JWT auth (skip in single-user mode)
         let auth = if config.single_user_mode {
             None
         } else {
-            Some(Arc::new(JwtAuth::new_hs256(config.jwt_secret.as_bytes())))
+            let jwt_auth = JwtAuth::new_hs256(config.jwt_secret.as_bytes())
+                .with_issuer(&config.jwt_issuer);
+            Some(Arc::new(jwt_auth))
         };
+
+        // Initialize OIDC auth if configured
+        let oidc = if let Some(ref oidc_config) = config.oidc {
+            let oidc_cfg = OidcConfig::new(
+                &oidc_config.issuer_url,
+                &oidc_config.client_id,
+                &oidc_config.client_secret,
+                &oidc_config.redirect_url,
+            )
+            .with_scopes(oidc_config.scopes.clone());
+
+            let mut oidc_auth = OidcAuth::new(oidc_cfg);
+
+            // Try to discover OIDC provider metadata
+            match discover_oidc_metadata(&oidc_auth).await {
+                Ok(metadata) => {
+                    tracing::info!(
+                        issuer = %metadata.issuer,
+                        "OIDC provider metadata discovered"
+                    );
+                    oidc_auth = oidc_auth.with_metadata(metadata);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "Failed to discover OIDC metadata, OIDC auth may not work"
+                    );
+                }
+            }
+
+            Some(Arc::new(oidc_auth))
+        } else {
+            None
+        };
+
+        // Initialize auth state store
+        let auth_state_store = crate::auth_routes::create_auth_state_store();
 
         // Initialize worker registry
         let worker_registry = Arc::new(RwLock::new(WorkerRegistry::new(
@@ -63,11 +111,34 @@ impl AppState {
         Ok(Self {
             store,
             auth,
+            oidc,
+            auth_state_store,
             worker_registry,
             log_broadcaster,
             config: Arc::new(config),
         })
     }
+}
+
+/// Discover OIDC provider metadata
+async fn discover_oidc_metadata(
+    oidc: &OidcAuth,
+) -> Result<auth::OidcProviderMetadata, Box<dyn std::error::Error + Send + Sync>> {
+    let discovery_url = oidc.discovery_url();
+    let client = reqwest::Client::new();
+
+    let response = client.get(&discovery_url).send().await?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "OIDC discovery failed with status: {}",
+            response.status()
+        )
+        .into());
+    }
+
+    let metadata: auth::OidcProviderMetadata = response.json().await?;
+    Ok(metadata)
 }
 
 /// State initialization errors

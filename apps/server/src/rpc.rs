@@ -24,12 +24,9 @@ use crate::state::AppState;
 /// Handle a JSON-RPC request
 pub async fn handle_rpc(
     State(state): State<AppState>,
+    axum::Extension(user): axum::Extension<Option<AuthenticatedUser>>,
     Json(request): Json<JsonRpcRequest>,
 ) -> (StatusCode, Json<JsonRpcResponse>) {
-    // In a full implementation, we would extract the user from the Authorization
-    // header For now, skip auth in single-user mode
-    let user: Option<AuthenticatedUser> = None;
-
     let response = match dispatch_method(&state, &user, &request).await {
         Ok(result) => JsonRpcResponse::success(request.id, result),
         Err(error) => JsonRpcResponse::error(request.id, error),
