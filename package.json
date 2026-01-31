@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev:local": "PUBLIC_SKIP_MODE_SELECTION=true PUBLIC_DEFAULT_MODE=local pnpm dev:inner",
-    "dev:remote": "PUBLIC_SKIP_MODE_SELECTION=true PUBLIC_REMOTE_SERVER_URL=http://localhost:54871 pnpm dev:inner",
+    "dev:remote": "PUBLIC_SKIP_MODE_SELECTION=true PUBLIC_DEFAULT_MODE=remote PUBLIC_REMOTE_SERVER_URL=http://localhost:54871 pnpm dev:inner",
     "dev:inner": "turbo run dev",
     "dev:db": "podman compose up -d",
     "build": "turbo run build",
