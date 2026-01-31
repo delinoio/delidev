@@ -1,6 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["apps/desktop/src-tauri"]
+members = [
+    "apps/desktop/src-tauri",
+    "crates/coding_agents",
+    "crates/task_store",
+    "crates/rpc_protocol",
+    "crates/git_ops",
+    "crates/auth",
+    "crates/secrets",
+]
 
 # Release profile optimizations
 [profile.release]

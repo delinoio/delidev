@@ -1,0 +1,17 @@
+[package]
+name = "auth"
+version = "0.1.0"
+edition = "2021"
+description = "Authentication and authorization for DeliDev"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2"
+tracing = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
