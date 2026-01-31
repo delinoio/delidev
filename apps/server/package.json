@@ -1,5 +1,5 @@
 {
-  "name": "main-server",
+  "name": "@delinoio/delidev-main-server",
   "private": true,
   "scripts": {
     "dev": "cargo run"

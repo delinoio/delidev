@@ -175,7 +175,11 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  apps/worker: {}
+  apps/worker:
+    devDependencies:
+      '@delinoio/delidev-main-server':
+        specifier: workspace:*
+        version: link:../server
 
 packages:
 

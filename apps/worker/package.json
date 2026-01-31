@@ -1,7 +1,10 @@
 {
-  "name": "worker-server",
+  "name": "@delinoio/delidev-worker-server",
   "private": true,
   "scripts": {
     "dev": "cargo run"
+  },
+  "devDependencies": {
+    "@delinoio/delidev-main-server": "workspace:*"
   }
 }
