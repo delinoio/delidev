@@ -204,6 +204,43 @@ DeliDev supports an optional distributed mode for remote execution:
 
 In single-process mode, the desktop app embeds all components (server + worker) for a seamless local experience with no network overhead.
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Single Process Desktop App                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+│  │   Embedded Server   │  │   Embedded Worker   │  │      Client UI      │  │
+│  │   (EmbeddedServer)  │  │   (EmbeddedWorker)  │  │   (Tauri WebView)   │  │
+│  │                     │  │                     │  │                     │  │
+│  │  In-process calls   │◄─┤  In-process calls   │◄─┤   In-process calls  │  │
+│  │  (no network)       │  │  (no network)       │  │   (no network)      │  │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                          SQLite Database                                 ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  Auth: DISABLED (single user, trusted local execution)                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Single Process Mode Implementation (`apps/desktop/src-tauri/src/single_process/`):**
+
+| Module | Purpose |
+|--------|---------|
+| `config.rs` | Process mode configuration (single_process vs remote) |
+| `embedded_server.rs` | Local RPC handling without network I/O |
+| `embedded_worker.rs` | Local task execution and tracking |
+| `mod.rs` | SingleProcessRuntime orchestration |
+
+**Key Features:**
+- **No network overhead**: All RPC calls are direct function invocations
+- **SQLite storage**: Uses the desktop app's existing SQLite database
+- **No authentication**: Trusted local execution environment
+- **Seamless mode switching**: Frontend hooks work identically in both modes
+
 ---
 
 ## Technology Stack

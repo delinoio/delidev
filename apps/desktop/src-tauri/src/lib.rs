@@ -8,8 +8,11 @@ pub mod config;
 pub mod database;
 pub mod entities;
 pub mod services;
+pub mod single_process;
 
+use commands::SingleProcessState;
 use services::AppState;
+use single_process::{ProcessMode, SingleProcessConfig, SingleProcessRuntime};
 
 const SENTRY_DSN: &str =
     "https://9930ad2c1205512beb8738957c0a0271@o4510703761227776.ingest.us.sentry.io/4510703764635648";
@@ -128,6 +131,10 @@ pub fn run() {
             // Update commands
             commands::check_for_update,
             commands::download_and_install_update,
+            // Server mode commands
+            commands::get_server_mode,
+            commands::set_server_mode,
+            commands::is_single_process_mode,
         ])
         .setup(|app| {
             // Initialize tracing with Sentry integration
@@ -173,6 +180,36 @@ pub fn run() {
                     return Err(format!("Failed to initialize application: {}", e).into());
                 }
             }
+
+            // Initialize single-process mode state and runtime
+            let single_process_config = SingleProcessConfig::default();
+            let single_process_state = if single_process_config.mode == ProcessMode::SingleProcess {
+                // Initialize the runtime in single-process mode
+                let runtime_result = tauri::async_runtime::block_on(async {
+                    SingleProcessRuntime::new(single_process_config.clone()).await
+                });
+
+                match runtime_result {
+                    Ok(runtime) => {
+                        tracing::info!("Single-process runtime initialized successfully");
+                        let mut state = SingleProcessState::with_config(single_process_config);
+                        *state.runtime.get_mut() = Some(Arc::new(runtime));
+                        state
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to initialize single-process runtime: {}. Falling back to \
+                             uninitialized state.",
+                            e
+                        );
+                        SingleProcessState::with_config(single_process_config)
+                    }
+                }
+            } else {
+                SingleProcessState::with_config(single_process_config)
+            };
+            app_handle.manage(single_process_state);
+            tracing::info!("Single-process state initialized");
 
             // Register global shortcut plugin
             #[cfg(desktop)]

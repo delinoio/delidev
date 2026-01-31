@@ -2,6 +2,7 @@ mod config;
 mod custom_commands;
 mod repositories;
 mod repository_groups;
+mod server_mode;
 mod system;
 mod tasks;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -12,6 +13,7 @@ pub use config::*;
 pub use custom_commands::*;
 pub use repositories::*;
 pub use repository_groups::*;
+pub use server_mode::*;
 pub use system::*;
 pub use tasks::*;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
