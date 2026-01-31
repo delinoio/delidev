@@ -140,6 +140,13 @@ impl ContainerRuntime {
             Self::Podman => "npipe:////./pipe/podman-machine-default".to_string(),
         }
     }
+
+    /// Mobile platforms don't support containers
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    pub fn default_socket_path(&self) -> String {
+        // Containers are not available on mobile
+        String::new()
+    }
 }
 
 /// Agent configuration for a specific purpose
