@@ -168,7 +168,6 @@ CREATE TABLE repositories (
     id UUID PRIMARY KEY,
     workspace_id UUID NOT NULL REFERENCES workspaces(id),
     name VARCHAR(255) NOT NULL,
-    local_path TEXT NOT NULL,
     remote_url TEXT NOT NULL,
     default_branch VARCHAR(255) NOT NULL DEFAULT 'main',
     vcs_type VARCHAR(50) NOT NULL DEFAULT 'git',

@@ -341,7 +341,6 @@ Tasks that humans should do but AI can assist with.
 | vcsProviderType | VCSProviderType | Y | VCS provider |
 | remoteUrl | string | Y | Remote URL |
 | name | string | Y | Repository name |
-| localPath | string | Y | Local filesystem path |
 | defaultBranch | string | Y | Default branch |
 
 ### Workspace
