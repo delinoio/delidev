@@ -17,6 +17,12 @@ import type {
   RepositoryGroup,
 } from "../types";
 
+// Re-export client modules for easier imports
+export * from "./rpc";
+export * from "./hooks";
+export * from "./client-config";
+export { ClientProvider, useClient, WhenInitialized, WhenSingleProcess, WhenRemote, WhenAuthenticated } from "./ClientProvider";
+
 // ========== System API ==========
 
 export interface AppInfo {
