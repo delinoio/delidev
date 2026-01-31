@@ -8,6 +8,7 @@ pub mod config;
 pub mod database;
 pub mod entities;
 pub mod services;
+pub mod single_process;
 
 use services::AppState;
 
@@ -128,6 +129,10 @@ pub fn run() {
             // Update commands
             commands::check_for_update,
             commands::download_and_install_update,
+            // Server mode commands
+            commands::get_server_mode,
+            commands::set_server_mode,
+            commands::is_single_process_mode,
         ])
         .setup(|app| {
             // Initialize tracing with Sentry integration

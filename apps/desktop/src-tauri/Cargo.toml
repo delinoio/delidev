@@ -86,6 +86,11 @@ strip-ansi-escapes = "0.2"
 sentry = "0.35"
 sentry-tracing = "0.35"
 
+# Single process mode: embedded server and RPC
+delidev-server = { path = "../../server" }
+rpc_protocol = { path = "../../../crates/rpc_protocol" }
+task_store = { path = "../../../crates/task_store" }
+
 # Native notification support with click handlers
 [target.'cfg(target_os = "windows")'.dependencies]
 tauri-winrt-notification = "0.7"
