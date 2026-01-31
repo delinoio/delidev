@@ -80,7 +80,7 @@ jobs:
         if: ${{ runner.environment != 'self-hosted' }}
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/desktop/src-tauri
+          workspaces: apps/tauri-app/src-tauri
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -90,7 +90,7 @@ jobs:
 
       # Build with debug symbols first for Sentry (only if Sentry is configured)
       - name: Build with debug symbols for Sentry
-        working-directory: apps/desktop/src-tauri
+        working-directory: apps/tauri-app/src-tauri
         run: |
           if [ "${{ matrix.target }}" != "" ]; then
             cargo build --profile release-with-debug --target ${{ matrix.target }}
@@ -108,7 +108,7 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-        working-directory: apps/desktop/src-tauri
+        working-directory: apps/tauri-app/src-tauri
         run: |
           if [ "${{ matrix.target }}" != "" ]; then
             sentry-cli debug-files upload --include-sources \

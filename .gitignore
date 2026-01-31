@@ -199,9 +199,9 @@ target
 /delidev
 
 # Tauri
-apps/desktop/src-tauri/target
-apps/desktop/src-tauri/gen
-apps/desktop/dist
+apps/tauri-app/src-tauri/target
+apps/tauri-app/src-tauri/gen
+apps/tauri-app/dist
 
 .turbo
 .DS_Store
