@@ -260,13 +260,13 @@ fn parse_repository_url(url: &str) -> Result<(String, VCSProviderType), String> 
     // Try to extract from HTTPS/HTTP URLs first
     let name = if cleaned.contains("://") {
         // HTTPS/HTTP or ssh:// URL format
-        cleaned.split('/').filter(|s| !s.is_empty()).next_back()
+        cleaned.split('/').rfind(|s| !s.is_empty())
     } else if cleaned.contains(':') {
         // SSH format: git@github.com:owner/repo
         cleaned
             .split(':')
             .next_back()
-            .and_then(|path| path.split('/').filter(|s| !s.is_empty()).next_back())
+            .and_then(|path| path.split('/').rfind(|s| !s.is_empty()))
     } else {
         None
     };
