@@ -52,7 +52,7 @@ jobs:
       # - name: Update version in Cargo.toml
       #   run: |
       #     VERSION="${{ github.event.inputs.version }}"
-      #     sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' apps/desktop/src-tauri/Cargo.toml
+      #     sed -i 's/^version = ".*"/version = "'"$VERSION"'"/' apps/tauri-app/src-tauri/Cargo.toml
 
       - name: Update version in package.json
         run: |
@@ -63,7 +63,7 @@ jobs:
       - name: Update version in tauri.conf.json
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          cd apps/desktop/src-tauri
+          cd apps/tauri-app/src-tauri
           jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
 
       - name: Commit version changes

@@ -60,7 +60,7 @@ Desktop apps can run in single-process mode, embedding both Server and Worker:
 ### Implementation
 
 ```
-apps/desktop/src-tauri/src/single_process/
+apps/tauri-app/src-tauri/src/single_process/
 ├── mod.rs              # SingleProcessRuntime orchestration
 ├── config.rs           # Mode configuration (single_process vs remote)
 ├── embedded_server.rs  # Local RPC handling without network
@@ -97,7 +97,7 @@ if (mode === 'local') {
 ## Frontend Structure
 
 ```
-apps/desktop/src/
+apps/tauri-app/src/
 ├── api/
 │   ├── client-config.ts    # Mode configuration
 │   ├── ClientProvider.tsx  # React context for client state

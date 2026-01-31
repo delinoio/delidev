@@ -89,7 +89,7 @@ jobs:
             patchelf
 
       - name: Create frontend dist placeholder
-        run: mkdir -p apps/desktop/dist && echo "<html></html>" > apps/desktop/dist/index.html
+        run: mkdir -p apps/tauri-app/dist && echo "<html></html>" > apps/tauri-app/dist/index.html
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -122,7 +122,7 @@ jobs:
             patchelf
 
       - name: Create frontend dist placeholder
-        run: mkdir -p apps/desktop/dist && echo "<html></html>" > apps/desktop/dist/index.html
+        run: mkdir -p apps/tauri-app/dist && echo "<html></html>" > apps/tauri-app/dist/index.html
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
