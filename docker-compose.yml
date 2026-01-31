@@ -1,0 +1,86 @@
+# DeliDev Development Environment
+#
+# Usage:
+#   docker compose up -d              # Start PostgreSQL for multi-user mode
+#   docker compose --profile worker up # Start PostgreSQL and worker
+#
+# For local development with single-user mode (SQLite):
+#   Set DELIDEV_SINGLE_USER_MODE=true in .env, no Docker services needed
+#
+# For development with multi-user mode (PostgreSQL):
+#   1. Copy .env.example to .env
+#   2. Set DELIDEV_SINGLE_USER_MODE=false
+#   3. Run: docker compose up -d
+#   4. Run server: cargo run -p delidev-server
+#   5. Run worker: cargo run -p delidev-worker
+
+services:
+  # PostgreSQL database for multi-user mode
+  postgres:
+    image: postgres:16-alpine
+    container_name: delidev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: delidev
+      POSTGRES_PASSWORD: delidev
+      POSTGRES_DB: delidev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delidev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # DeliDev Server (optional - usually run with cargo for development)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: delidev-server
+    profiles:
+      - full
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DELIDEV_BIND_ADDRESS=0.0.0.0:8080
+      - DELIDEV_SINGLE_USER_MODE=false
+      - DATABASE_URL=postgres://delidev:delidev@postgres:5432/delidev
+      - DELIDEV_JWT_SECRET=${DELIDEV_JWT_SECRET:-change-me-in-production}
+      - DELIDEV_LOG_LEVEL=${DELIDEV_LOG_LEVEL:-info}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # DeliDev Worker (optional - usually run with cargo for development)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: delidev-worker
+    profiles:
+      - full
+      - worker
+    depends_on:
+      - server
+    environment:
+      - DELIDEV_SERVER_URL=http://server:8080
+      - DELIDEV_WORKER_BIND_ADDRESS=0.0.0.0:9000
+      - DELIDEV_CONTAINER_RUNTIME=docker
+      - DELIDEV_USE_CONTAINER=false
+      - DELIDEV_LOG_LEVEL=${DELIDEV_LOG_LEVEL:-info}
+    volumes:
+      # Mount Docker socket for container execution
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount worktree directory
+      - worker_worktrees:/tmp/delidev/worktrees
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  worker_worktrees:
