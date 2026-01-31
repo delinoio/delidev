@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:db": "podman compose up -d",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",

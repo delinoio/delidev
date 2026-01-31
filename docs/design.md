@@ -1564,3 +1564,41 @@ Common error scenarios and their resolutions.
 | SSL certificate error | Certificate issues | Update system certificates |
 | Proxy error | Proxy misconfiguration | Configure proxy settings if required |
 
+---
+
+## Development Setup
+
+### Quick Start
+
+1. Copy `.env.example` to `.env` and configure as needed
+2. For single-user mode (SQLite, no auth):
+   - Set `DELIDEV_SINGLE_USER_MODE=true` in `.env`
+   - Run `cargo run -p delidev-server`
+   - Run `cargo run -p delidev-worker` (in another terminal)
+
+3. For multi-user mode (PostgreSQL):
+   - Set `DELIDEV_SINGLE_USER_MODE=false` in `.env`
+   - Start PostgreSQL: `docker compose up -d`
+   - Run `cargo run -p delidev-server`
+   - Run `cargo run -p delidev-worker` (in another terminal)
+
+### Docker Compose Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `postgres` | PostgreSQL database for multi-user mode | 5432 |
+| `server` | DeliDev main server (optional, for containerized deployment) | 54871 |
+| `worker` | DeliDev worker (optional, for containerized deployment) | 54872 |
+
+### Environment Variables
+
+See `.env.example` for all available environment variables with descriptions.
+
+Key variables for development:
+
+| Variable | Description |
+|----------|-------------|
+| `DELIDEV_SINGLE_USER_MODE` | Set to `true` for local SQLite mode |
+| `DATABASE_URL` | PostgreSQL connection URL (multi-user mode) |
+| `DELIDEV_LOG_LEVEL` | Log level: trace, debug, info, warn, error |
+

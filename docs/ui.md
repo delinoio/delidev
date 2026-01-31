@@ -2,9 +2,80 @@
 
 DeliDev is a desktop application with the following main interfaces.
 
+## Mode Selection
+
+Mode selection screen shown on first start to choose between Local Mode and Server Mode.
+
+**Note**: In development mode (`pnpm dev`), this screen is shown on every start to allow developers to easily test both modes.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        Welcome to DeliDev                                    │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  Choose how you want to run DeliDev                                        │
+│                                                                            │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │ [Monitor Icon]                                                      │   │
+│  │                                                                     │   │
+│  │ Local Mode                                                          │   │
+│  │ Run everything locally on your machine. All processing happens     │   │
+│  │ on your computer with no external server required.                  │   │
+│  │                                                                     │   │
+│  │ • Full privacy - your code never leaves your machine                │   │
+│  │ • No network latency                                                │   │
+│  │ • Works offline (requires local AI setup)                           │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │ [Server Icon]                                                       │   │
+│  │                                                                     │   │
+│  │ Server Mode                                                         │   │
+│  │ Connect to a remote DeliDev server for task execution and          │   │
+│  │ coordination.                                                       │   │
+│  │                                                                     │   │
+│  │ • Centralized task management                                       │   │
+│  │ • Team collaboration support                                        │   │
+│  │ • Offload computation to server                                     │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+│  ── Server URL Input (shown when Server Mode selected) ──                  │
+│  ┌────────────────────────────────────────────────────────────────────┐   │
+│  │ Server URL                              [ https://...           ]   │   │
+│  │ Enter the URL of your DeliDev server                                │   │
+│  │                                        [Test Connection]            │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                            │
+├────────────────────────────────────────────────────────────────────────────┤
+│  You can change this setting later in Settings                             │
+│                                                          [Continue →]      │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Mode Selection Features
+
+| Feature | Description |
+|---------|-------------|
+| Local Mode | Runs server, worker, and client all in one process (single-process mode) |
+| Server Mode | Connects to a remote DeliDev server for distributed execution |
+| Connection Test | Validates server URL before proceeding (Server Mode only) |
+| Dev Mode Behavior | In development mode, mode selection is shown on every start |
+| Persistence | Mode choice is saved and remembered for subsequent starts (production) |
+
+### Development Mode
+
+When running `pnpm dev`, the mode selection screen is always shown at startup. This allows developers to:
+- Test Local Mode behavior
+- Test Server Mode with different server URLs
+- Easily switch between modes during development
+
+To force mode selection in production, add `?force_mode_selection=true` to the URL.
+
+---
+
 ## Onboarding
 
-First-time setup wizard shown when the app is launched for the first time.
+First-time setup wizard shown after mode selection when the app is launched for the first time.
 
 ### Step 1: VCS Provider Connection
 
