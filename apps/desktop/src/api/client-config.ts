@@ -3,6 +3,11 @@
  *
  * This module handles the configuration for switching between single-process
  * mode (local desktop app) and client mode (connecting to remote server).
+ *
+ * The mode can be configured via:
+ * 1. Environment variables (PUBLIC_DEFAULT_MODE, PUBLIC_REMOTE_SERVER_URL)
+ * 2. LocalStorage (persisted user selection)
+ * 3. Default (single_process)
  */
 
 import { invoke } from "@tauri-apps/api/core";
@@ -26,12 +31,52 @@ export interface AppConfig {
 
 const STORAGE_KEY = "delidev_client_config";
 
+// ========== Environment Variable Configuration ==========
+
+/**
+ * Gets the mode configuration from environment variables
+ */
+export function getEnvConfig(): ServerConfig | null {
+  const defaultMode = import.meta.env.PUBLIC_DEFAULT_MODE;
+  const serverUrl = import.meta.env.PUBLIC_REMOTE_SERVER_URL;
+
+  if (defaultMode === "remote") {
+    if (!serverUrl) {
+      console.warn(
+        "PUBLIC_DEFAULT_MODE is 'remote' but PUBLIC_REMOTE_SERVER_URL is not set"
+      );
+      return null;
+    }
+    return { mode: "remote", serverUrl };
+  } else if (defaultMode === "local") {
+    return { mode: "single_process" };
+  }
+
+  // No valid env config
+  return null;
+}
+
+/**
+ * Checks if mode selection should be skipped based on env vars
+ */
+export function shouldSkipModeSelection(): boolean {
+  const skipSelection = import.meta.env.PUBLIC_SKIP_MODE_SELECTION;
+  return skipSelection === "true" || skipSelection === "1";
+}
+
 // ========== Configuration Management ==========
 
 /**
  * Gets the stored client configuration
  */
 export function getStoredConfig(): ServerConfig {
+  // First check environment variables for explicit configuration
+  const envConfig = getEnvConfig();
+  if (envConfig && shouldSkipModeSelection()) {
+    return envConfig;
+  }
+
+  // Then check localStorage for user selection
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -39,6 +84,11 @@ export function getStoredConfig(): ServerConfig {
     }
   } catch {
     // Ignore parse errors
+  }
+
+  // Finally, fall back to env config or default
+  if (envConfig) {
+    return envConfig;
   }
 
   // Default to single process mode

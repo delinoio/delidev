@@ -7,7 +7,11 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "tauri dev",
+    "dev:local": "PUBLIC_DEFAULT_MODE=local PUBLIC_SKIP_MODE_SELECTION=true tauri dev",
+    "dev:remote": "PUBLIC_SKIP_MODE_SELECTION=true tauri dev",
     "dev:frontend": "rsbuild dev",
+    "dev:frontend:local": "PUBLIC_DEFAULT_MODE=local PUBLIC_SKIP_MODE_SELECTION=true rsbuild dev",
+    "dev:frontend:remote": "PUBLIC_SKIP_MODE_SELECTION=true rsbuild dev",
     "build": "rsbuild build",
     "preview": "rsbuild preview",
     "tauri": "tauri",
