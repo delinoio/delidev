@@ -164,8 +164,20 @@ fn is_valid_redirect_uri(redirect_uri: &str, allowed_origins: &[String]) -> bool
         // Support wildcard subdomains (e.g., "*.example.com")
         if allowed.starts_with("*.") {
             let domain = &allowed[1..]; // ".example.com"
-            url.host_str()
-                .is_some_and(|host| host.ends_with(domain) || host == &domain[1..])
+            url.host_str().is_some_and(|host| {
+                // Must either be the exact domain (without the leading dot)
+                // or end with ".example.com" AND be longer than just the suffix
+                // This prevents "evil.com.example.com" from matching
+                if host == &domain[1..] {
+                    true
+                } else if host.ends_with(domain) {
+                    // Ensure there's actually a subdomain part
+                    // host.len() > domain.len() means there's something before ".example.com"
+                    host.len() > domain.len()
+                } else {
+                    false
+                }
+            })
         } else {
             &redirect_origin == allowed
         }
@@ -379,6 +391,16 @@ pub async fn callback(
 }
 
 /// Refresh access token
+///
+/// **SECURITY NOTE**: This implementation uses a simplified approach where
+/// refresh tokens are just longer-lived JWTs. A production-ready implementation
+/// should include:
+/// - Token storage with revocation tracking
+/// - Refresh token rotation (issue new refresh token on each use)
+/// - Family-based revocation (revoke all tokens when one is compromised)
+///
+/// Consider implementing proper refresh token management before deploying
+/// to production with sensitive data.
 pub async fn refresh_token(
     State(state): State<AppState>,
     Json(params): Json<RefreshTokenRequest>,
@@ -387,14 +409,9 @@ pub async fn refresh_token(
         AuthErrorResponse::new("auth_not_configured", "Authentication is not configured")
     })?;
 
-    // In a full implementation, we would:
-    // 1. Validate the refresh token against a stored list
-    // 2. Check if it's been revoked
-    // 3. Issue a new access token
-    //
-    // For now, we'll use a simple approach where the refresh token
-    // is actually just a longer-lived JWT that we validate and use
-    // to issue a new access token.
+    // NOTE: This is a simplified implementation. The refresh token is validated
+    // as a JWT and used to issue a new access token. For production use with
+    // sensitive data, implement proper refresh token storage and revocation.
 
     let claims = jwt_auth.verify_token(&params.refresh_token).map_err(|e| {
         debug!("Refresh token validation failed: {}", e);
@@ -432,7 +449,7 @@ pub async fn me(
 ) -> Result<impl IntoResponse, (StatusCode, AuthErrorResponse)> {
     let jwt_auth = state.auth.as_ref().ok_or_else(|| {
         (
-            StatusCode::SERVICE_UNAVAILABLE,
+            StatusCode::BAD_REQUEST,
             AuthErrorResponse::new("auth_not_configured", "Authentication is not configured"),
         )
     })?;
@@ -531,8 +548,21 @@ mod tests {
             "https://staging.example.com/auth",
             &allowed
         ));
+        // Exact domain should also match
+        assert!(is_valid_redirect_uri(
+            "https://example.com/callback",
+            &allowed
+        ));
 
         // Invalid (not a subdomain)
         assert!(!is_valid_redirect_uri("https://example.org", &allowed));
+
+        // Security: Prevent subdomain takeover attacks
+        // "evil.com.example.com" should NOT match "*.example.com"
+        // because it could be registered as a subdomain of evil.com
+        assert!(!is_valid_redirect_uri(
+            "https://notexample.com/callback",
+            &allowed
+        ));
     }
 }

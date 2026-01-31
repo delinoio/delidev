@@ -1,7 +1,5 @@
 //! Application state
 
-#![allow(dead_code)]
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -229,6 +227,7 @@ async fn discover_oidc_metadata(
     let discovery_url = oidc.discovery_url();
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
+        .connect_timeout(Duration::from_secs(10))
         .build()?;
 
     let response = client.get(&discovery_url).send().await?;
@@ -251,6 +250,7 @@ pub enum StateError {
     #[error("Failed to initialize database: {0}")]
     Database(String),
 
+    #[allow(dead_code)]
     #[error("Failed to initialize auth: {0}")]
     Auth(String),
 }

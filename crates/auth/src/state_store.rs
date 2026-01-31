@@ -4,9 +4,9 @@
 //! Supports both in-memory (for testing) and database (for production) storage.
 
 use std::collections::HashMap;
-use std::sync::RwLock;
 
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
 use crate::{AuthError, AuthResult, AuthorizationState};
 
@@ -44,27 +44,18 @@ impl MemoryAuthStateStore {
 #[async_trait]
 impl AuthStateStore for MemoryAuthStateStore {
     async fn store(&self, state: &AuthorizationState) -> AuthResult<()> {
-        let mut states = self
-            .states
-            .write()
-            .map_err(|e| AuthError::Oidc(format!("Lock poisoned: {}", e)))?;
+        let mut states = self.states.write().await;
         states.insert(state.state.clone(), state.clone());
         Ok(())
     }
 
     async fn take(&self, state_token: &str) -> AuthResult<Option<AuthorizationState>> {
-        let mut states = self
-            .states
-            .write()
-            .map_err(|e| AuthError::Oidc(format!("Lock poisoned: {}", e)))?;
+        let mut states = self.states.write().await;
         Ok(states.remove(state_token))
     }
 
     async fn cleanup_expired(&self, max_age_secs: i64) -> AuthResult<usize> {
-        let mut states = self
-            .states
-            .write()
-            .map_err(|e| AuthError::Oidc(format!("Lock poisoned: {}", e)))?;
+        let mut states = self.states.write().await;
         let before_count = states.len();
         states.retain(|_, state| !state.is_expired(max_age_secs));
         Ok(before_count - states.len())

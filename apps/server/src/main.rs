@@ -141,6 +141,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // Start auth state cleanup task (remove expired OIDC authorization states)
+    let auth_cleanup_state = state.clone();
+    tokio::spawn(async move {
+        // Run cleanup every hour
+        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            // Use the same expiration as AUTH_STATE_EXPIRATION_SECS (10 minutes = 600 seconds)
+            match auth_cleanup_state.auth_state_store.cleanup_expired(600).await {
+                Ok(count) if count > 0 => {
+                    info!(count = count, "Cleaned up expired auth states");
+                }
+                Ok(_) => {
+                    // No expired states to clean up
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to cleanup expired auth states");
+                }
+            }
+        }
+    });
+
     // Bind and serve
     let listener = TcpListener::bind(&config.bind_address).await?;
     info!(address = %config.bind_address, "Server listening");

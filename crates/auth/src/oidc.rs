@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{AuthError, AuthResult, AuthenticatedUser};
 
 /// OpenID Connect configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct OidcConfig {
     /// The OIDC provider's issuer URL (e.g., "https://accounts.google.com")
     pub issuer_url: String,
@@ -25,6 +25,19 @@ pub struct OidcConfig {
     /// Scopes to request (defaults to ["openid", "email", "profile"])
     #[serde(default = "default_scopes")]
     pub scopes: Vec<String>,
+}
+
+// Custom Debug implementation to prevent client_secret from being logged
+impl std::fmt::Debug for OidcConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OidcConfig")
+            .field("issuer_url", &self.issuer_url)
+            .field("client_id", &self.client_id)
+            .field("client_secret", &"[REDACTED]")
+            .field("redirect_url", &self.redirect_url)
+            .field("scopes", &self.scopes)
+            .finish()
+    }
 }
 
 fn default_scopes() -> Vec<String> {
@@ -271,10 +284,11 @@ impl Default for AuthorizationState {
     }
 }
 
-/// Generate a random string for state/nonce
+/// Generate a cryptographically secure random string for state/nonce
 fn generate_random_string(len: usize) -> String {
     use rand::Rng;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    // Use rng() which is cryptographically secure (uses OsRng for seeding)
     let mut rng = rand::rng();
     (0..len)
         .map(|_| {
