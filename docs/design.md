@@ -43,7 +43,7 @@ DeliDev consists of three main components:
                                 │  JWT Auth (OpenID Connect)      │
                                 └─────────────┬───────────────────┘
                                               │
-                       JSON-RPC over HTTP/WebSocket
+                         Connect RPC over HTTP
                                               │
                 ┌─────────────────────────────┼─────────────────────────────┐
                 │                             │                             │
@@ -104,7 +104,7 @@ For desktop usage, all components can run in a single process for a seamless loc
 
 | Layer | Protocol |
 |-------|----------|
-| Client ↔ Main Server | JSON-RPC over HTTP/WebSocket |
+| Client ↔ Main Server | Connect RPC over HTTP |
 | Frontend State | react-query for data fetching |
 | Client ↔ Worker | **Not allowed** - all communication goes through Main Server |
 
@@ -139,7 +139,7 @@ For desktop usage, all components can run in a single process for a seamless loc
 |-------|---------|
 | `coding_agents` | AI agent abstraction, output normalization, Docker sandboxing |
 | `task_store` | Task storage (SQLite, PostgreSQL, in-memory) |
-| `rpc_protocol` | JSON-RPC 2.0 protocol definitions |
+| `rpc_protocol` | Connect RPC protocol definitions (Protobuf) |
 | `git_ops` | Git operations & worktree management |
 | `auth` | JWT authentication & RBAC |
 | `secrets` | Cross-platform keychain access |

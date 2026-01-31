@@ -8,7 +8,7 @@ The Main Server is the central hub of DeliDev's distributed architecture. It mai
 |----------------|-------------|
 | Task Management | Maintains the list of tasks (UnitTask, CompositeTask) |
 | Worker Coordination | Assigns tasks to available workers, tracks worker health |
-| RPC Server | Provides JSON-RPC API for clients |
+| RPC Server | Provides Connect RPC API for clients |
 | Authentication | Handles JWT authentication and OIDC (in remote mode) |
 | Secret Relay | Receives secrets from clients, relays to workers when tasks start |
 
@@ -21,7 +21,7 @@ The Main Server is the central hub of DeliDev's distributed architecture. It mai
 │                                                                 │
 │  ┌─────────────────────┐  ┌─────────────────────────────────┐  │
 │  │   RPC Endpoints     │  │      Worker Registry            │  │
-│  │   (JSON-RPC 2.0)    │  │   - Active workers list         │  │
+│  │   (Connect RPC)     │  │   - Active workers list         │  │
 │  │                     │  │   - Health check status         │  │
 │  └──────────┬──────────┘  │   - Task assignments            │  │
 │             │             └─────────────────────────────────┘  │
@@ -49,9 +49,9 @@ The Main Server is the central hub of DeliDev's distributed architecture. It mai
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## API Endpoints (JSON-RPC)
+## API Endpoints (Connect RPC)
 
-All endpoints use JSON-RPC 2.0 protocol over HTTP POST or WebSocket.
+All endpoints use Connect RPC protocol over HTTP. Services are defined in Protobuf and generated for both Rust and TypeScript.
 
 ### Task Management
 

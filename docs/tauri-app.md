@@ -30,7 +30,7 @@ The DeliDev client is built with Tauri, providing a cross-platform desktop and m
 │  │   ┌─────────────────────────────────────────────────┐   │   │
 │  │   │              API Layer                           │   │   │
 │  │   │  - Mode detection (local vs remote)              │   │   │
-│  │   │  - Tauri invoke (local) or JSON-RPC (remote)     │   │   │
+│  │   │  - Tauri invoke (local) or Connect RPC (remote)  │   │   │
 │  │   └─────────────────────────────────────────────────┘   │   │
 │  └────────────────────────┬────────────────────────────────┘   │
 │                           │                                     │
@@ -71,7 +71,7 @@ apps/desktop/src-tauri/src/single_process/
 
 | Aspect | Single Process Mode | Remote Mode |
 |--------|---------------------|-------------|
-| RPC | Direct function calls | JSON-RPC over HTTP/WebSocket |
+| RPC | Direct function calls | Connect RPC over HTTP |
 | Database | SQLite | PostgreSQL (on server) |
 | Worker | Embedded | Remote Worker Server |
 | Auth | Disabled | JWT + OIDC |
@@ -89,8 +89,8 @@ if (mode === 'local') {
   // Use Tauri invoke
   return invoke('task.createUnit', params);
 } else {
-  // Use JSON-RPC
-  return rpcClient.call('task.createUnit', params);
+  // Use Connect RPC
+  return taskService.createUnit(params);
 }
 ```
 
@@ -102,7 +102,7 @@ apps/desktop/src/
 │   ├── client-config.ts    # Mode configuration
 │   ├── ClientProvider.tsx  # React context for client state
 │   ├── hooks.ts            # react-query hooks
-│   └── rpc.ts              # JSON-RPC client
+│   └── rpc.ts              # Connect RPC client
 ├── components/
 │   ├── ui/                 # shadcn/ui components
 │   ├── dashboard/          # Dashboard components

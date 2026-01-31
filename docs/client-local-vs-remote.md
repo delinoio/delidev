@@ -116,7 +116,7 @@ Frontend updates via Tauri events
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │                    Frontend (WebView)                    │   │
-│  │  react-query ──► JSON-RPC ──► Main Server               │   │
+│  │  react-query ──► Connect RPC ──► Main Server            │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌─────────────────────┐                                       │
@@ -125,7 +125,7 @@ Frontend updates via Tauri events
 │                                                                 │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
-                    JSON-RPC over HTTPS
+                    Connect RPC over HTTPS
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -157,7 +157,7 @@ Frontend updates via Tauri events
 ```
 User creates task
         ▼
-Frontend sends JSON-RPC request
+Frontend sends Connect RPC request
         ▼
 Main Server authenticates (JWT)
         ▼
