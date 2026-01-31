@@ -305,6 +305,7 @@ The hooks automatically detect the current mode and route API calls appropriatel
 - Windows (x64, arm64)
 - macOS (x64, arm64)
 - Linux (x64, arm64)
+- iOS (arm64) - Server mode only, via TestFlight/App Store
 
 ---
 

@@ -43,7 +43,17 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin({
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                tauri_plugin_updater::Builder::new().build()
+            }
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                // On mobile, we use a no-op plugin since updates are handled by app stores
+                tauri::plugin::Builder::new("updater").build()
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // System commands
             commands::check_docker,

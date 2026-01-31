@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "iOS": {
+      "minimumSystemVersion": "14.0",
+      "developmentTeam": "${IOS_DEVELOPMENT_TEAM}",
+      "codeSignIdentity": "${IOS_CODE_SIGN_IDENTITY}"
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DeliDev",
+        "fullscreen": false,
+        "resizable": true
+      }
+    ]
+  },
+  "plugins": {}
+}

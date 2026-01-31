@@ -6,7 +6,6 @@ mod secrets;
 mod server_mode;
 mod system;
 mod tasks;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod update;
 mod workspaces;
 
@@ -18,6 +17,5 @@ pub use secrets::*;
 pub use server_mode::*;
 pub use system::*;
 pub use tasks::*;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use update::*;
 pub use workspaces::*;
