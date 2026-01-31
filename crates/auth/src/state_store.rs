@@ -67,10 +67,12 @@ pub use sqlx_store::*;
 
 #[cfg(feature = "sqlx")]
 mod sqlx_store {
-    use super::*;
     use sqlx::{Pool, Postgres, Sqlite};
 
-    /// PostgreSQL authorization state store (for multi-user production deployments)
+    use super::*;
+
+    /// PostgreSQL authorization state store (for multi-user production
+    /// deployments)
     #[derive(Clone)]
     pub struct PostgresAuthStateStore {
         pool: Pool<Postgres>,
@@ -140,27 +142,30 @@ mod sqlx_store {
         }
 
         async fn take(&self, state_token: &str) -> AuthResult<Option<AuthorizationState>> {
-            let row: Option<(String, String, Option<String>, i64, Option<String>)> = sqlx::query_as(
-                r#"
+            let row: Option<(String, String, Option<String>, i64, Option<String>)> =
+                sqlx::query_as(
+                    r#"
                 DELETE FROM auth_states
                 WHERE state_token = $1
                 RETURNING state_token, nonce, code_verifier, created_at, redirect_uri
                 "#,
-            )
-            .bind(state_token)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| AuthError::Oidc(format!("Failed to retrieve auth state: {}", e)))?;
+                )
+                .bind(state_token)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| AuthError::Oidc(format!("Failed to retrieve auth state: {}", e)))?;
 
-            Ok(row.map(|(state, nonce, code_verifier, created_at, redirect_uri)| {
-                AuthorizationState {
-                    state,
-                    nonce,
-                    code_verifier,
-                    created_at,
-                    redirect_uri,
-                }
-            }))
+            Ok(
+                row.map(|(state, nonce, code_verifier, created_at, redirect_uri)| {
+                    AuthorizationState {
+                        state,
+                        nonce,
+                        code_verifier,
+                        created_at,
+                        redirect_uri,
+                    }
+                }),
+            )
         }
 
         async fn cleanup_expired(&self, max_age_secs: i64) -> AuthResult<usize> {
@@ -245,24 +250,26 @@ mod sqlx_store {
         }
 
         async fn take(&self, state_token: &str) -> AuthResult<Option<AuthorizationState>> {
-            // SQLite doesn't support RETURNING in DELETE, so we need two queries in a transaction
+            // SQLite doesn't support RETURNING in DELETE, so we need two queries in a
+            // transaction
             let mut tx = self
                 .pool
                 .begin()
                 .await
                 .map_err(|e| AuthError::Oidc(format!("Failed to begin transaction: {}", e)))?;
 
-            let row: Option<(String, String, Option<String>, i64, Option<String>)> = sqlx::query_as(
-                r#"
+            let row: Option<(String, String, Option<String>, i64, Option<String>)> =
+                sqlx::query_as(
+                    r#"
                 SELECT state_token, nonce, code_verifier, created_at, redirect_uri
                 FROM auth_states
                 WHERE state_token = ?
                 "#,
-            )
-            .bind(state_token)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| AuthError::Oidc(format!("Failed to retrieve auth state: {}", e)))?;
+                )
+                .bind(state_token)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| AuthError::Oidc(format!("Failed to retrieve auth state: {}", e)))?;
 
             if row.is_some() {
                 sqlx::query(
@@ -281,15 +288,17 @@ mod sqlx_store {
                 .await
                 .map_err(|e| AuthError::Oidc(format!("Failed to commit transaction: {}", e)))?;
 
-            Ok(row.map(|(state, nonce, code_verifier, created_at, redirect_uri)| {
-                AuthorizationState {
-                    state,
-                    nonce,
-                    code_verifier,
-                    created_at,
-                    redirect_uri,
-                }
-            }))
+            Ok(
+                row.map(|(state, nonce, code_verifier, created_at, redirect_uri)| {
+                    AuthorizationState {
+                        state,
+                        nonce,
+                        code_verifier,
+                        created_at,
+                        redirect_uri,
+                    }
+                }),
+            )
         }
 
         async fn cleanup_expired(&self, max_age_secs: i64) -> AuthResult<usize> {

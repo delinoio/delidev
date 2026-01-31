@@ -1,7 +1,6 @@
 //! Application state
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use auth::{
     AuthStateStore, JwtAuth, MemoryAuthStateStore, OidcAuth, OidcConfig, PostgresAuthStateStore,
@@ -11,9 +10,7 @@ use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
 use crate::{
-    config::ServerConfig,
-    log_broadcaster::LogBroadcaster,
-    worker_registry::WorkerRegistry,
+    config::ServerConfig, log_broadcaster::LogBroadcaster, worker_registry::WorkerRegistry,
 };
 
 /// Default timeout for OIDC metadata discovery (30 seconds)
@@ -62,8 +59,8 @@ impl AppState {
         let auth = if config.single_user_mode {
             None
         } else {
-            let jwt_auth = JwtAuth::new_hs256(config.jwt_secret.as_bytes())
-                .with_issuer(&config.jwt_issuer);
+            let jwt_auth =
+                JwtAuth::new_hs256(config.jwt_secret.as_bytes()).with_issuer(&config.jwt_issuer);
             Some(Arc::new(jwt_auth))
         };
 
@@ -233,11 +230,7 @@ async fn discover_oidc_metadata(
     let response = client.get(&discovery_url).send().await?;
 
     if !response.status().is_success() {
-        return Err(format!(
-            "OIDC discovery failed with status: {}",
-            response.status()
-        )
-        .into());
+        return Err(format!("OIDC discovery failed with status: {}", response.status()).into());
     }
 
     let metadata: auth::OidcProviderMetadata = response.json().await?;

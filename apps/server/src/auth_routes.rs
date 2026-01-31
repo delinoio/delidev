@@ -207,7 +207,10 @@ pub async fn login(
 ) -> Result<impl IntoResponse, AuthErrorResponse> {
     // Check if OIDC is configured
     let oidc = state.oidc.as_ref().ok_or_else(|| {
-        AuthErrorResponse::new("oidc_not_configured", "OIDC authentication is not configured")
+        AuthErrorResponse::new(
+            "oidc_not_configured",
+            "OIDC authentication is not configured",
+        )
     })?;
 
     // Validate redirect_uri if provided (prevent open redirect)
@@ -232,10 +235,14 @@ pub async fn login(
     })?;
 
     // Store state for callback validation using the database-backed store
-    state.auth_state_store.store(&auth_state).await.map_err(|e| {
-        error!("Failed to store auth state: {}", e);
-        AuthErrorResponse::new("server_error", "Failed to initiate authentication")
-    })?;
+    state
+        .auth_state_store
+        .store(&auth_state)
+        .await
+        .map_err(|e| {
+            error!("Failed to store auth state: {}", e);
+            AuthErrorResponse::new("server_error", "Failed to initiate authentication")
+        })?;
 
     info!(
         state = %state_token,
@@ -286,7 +293,10 @@ pub async fn callback(
 
     // Get OIDC client
     let oidc = state.oidc.as_ref().ok_or_else(|| {
-        AuthErrorResponse::new("oidc_not_configured", "OIDC authentication is not configured")
+        AuthErrorResponse::new(
+            "oidc_not_configured",
+            "OIDC authentication is not configured",
+        )
     })?;
 
     // Exchange code for tokens
@@ -364,7 +374,10 @@ pub async fn callback(
 
     // Create our own JWT
     let jwt_auth = state.auth.as_ref().ok_or_else(|| {
-        AuthErrorResponse::new("auth_not_configured", "JWT authentication is not configured")
+        AuthErrorResponse::new(
+            "auth_not_configured",
+            "JWT authentication is not configured",
+        )
     })?;
 
     let access_token = jwt_auth
@@ -528,7 +541,10 @@ mod tests {
         ));
 
         // Invalid origins
-        assert!(!is_valid_redirect_uri("https://evil.com/callback", &allowed));
+        assert!(!is_valid_redirect_uri(
+            "https://evil.com/callback",
+            &allowed
+        ));
         assert!(!is_valid_redirect_uri(
             "https://app.example.com.evil.com",
             &allowed

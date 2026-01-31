@@ -5,9 +5,12 @@
 //!
 //! ## Features
 //!
-//! - **JWT Authentication**: Create and verify JWT tokens for API authentication
-//! - **OpenID Connect**: Integration with OIDC providers (Google, GitHub, Keycloak, etc.)
-//! - **Role-Based Access Control**: User roles (User, Admin, Worker) for authorization
+//! - **JWT Authentication**: Create and verify JWT tokens for API
+//!   authentication
+//! - **OpenID Connect**: Integration with OIDC providers (Google, GitHub,
+//!   Keycloak, etc.)
+//! - **Role-Based Access Control**: User roles (User, Admin, Worker) for
+//!   authorization
 //!
 //! ## Usage
 //!

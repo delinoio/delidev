@@ -148,8 +148,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut interval = tokio::time::interval(Duration::from_secs(3600));
         loop {
             interval.tick().await;
-            // Use the same expiration as AUTH_STATE_EXPIRATION_SECS (10 minutes = 600 seconds)
-            match auth_cleanup_state.auth_state_store.cleanup_expired(600).await {
+            // Use the same expiration as AUTH_STATE_EXPIRATION_SECS (10 minutes = 600
+            // seconds)
+            match auth_cleanup_state
+                .auth_state_store
+                .cleanup_expired(600)
+                .await
+            {
                 Ok(count) if count > 0 => {
                     info!(count = count, "Cleaned up expired auth states");
                 }
