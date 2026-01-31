@@ -26,6 +26,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +50,12 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'package.json'
               - 'turbo.json'
+            mobile:
+              - 'apps/tauri-app/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '**/*.rs'
+              - '.github/workflows/CI.yml'
 
   # ============================================
   # Rust Jobs
@@ -156,11 +163,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript check (desktop-app)
-        run: pnpm --filter desktop-app exec tsc --noEmit
-
-      - name: TypeScript check (webapp)
-        run: pnpm --filter webapp exec tsc --noEmit
+      - name: TypeScript check (tauri-app)
+        run: pnpm --filter tauri-app exec tsc --noEmit
 
   frontend-lint:
     name: Frontend Lint
@@ -210,6 +214,120 @@ jobs:
           
       - name: Build
         run: pnpm build
+
+  # ============================================
+  # Mobile Build Jobs
+  # ============================================
+
+  # android-build:
+  #   name: Android Build
+  #   runs-on: 'ubuntu-latest'
+  #   needs: changes
+  #   if: needs.changes.outputs.mobile == 'true'
+  #   env:
+  #     # tauri needs CI to be true to build
+  #     CI: 'true'
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup Java
+  #       uses: actions/setup-java@v4
+  #       with:
+  #         distribution: 'temurin'
+  #         java-version: '17'
+
+  #     - name: Setup Android SDK
+  #       uses: android-actions/setup-android@v3
+
+  #     - name: Setup Android NDK
+  #       run: |
+  #         sdkmanager --install "ndk;27.0.12077973"
+  #         echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v4
+
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "pnpm"
+
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+  #     - name: Cache cargo
+  #       if: ${{ runner.environment != 'self-hosted' }}
+  #       uses: Swatinem/rust-cache@v2
+
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile
+
+  #     - name: Configure environment variables
+  #       run: |
+  #         pnpm i -g vercel
+  #         pnpm run --parallel prepare:app
+  #       env:
+  #         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+  #     - name: Build Android
+  #       run: pnpm --filter tauri-app exec tauri android build --target aarch64
+  #       env:
+  #         NDK_HOME: ${{ env.NDK_HOME }}
+
+  ios-build:
+    name: iOS Build
+    runs-on: 'macos-latest'
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    env:
+      # tauri needs CI to be true to build
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Install iOS Simulator runtime
+        run: |
+          xcodebuild -downloadPlatform iOS
+          xcrun simctl list runtimes
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Cache cargo
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure environment variables
+        run: |
+          pnpm i -g vercel
+          pnpm run --parallel prepare:app
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build iOS (Simulator)
+        run: pnpm --filter tauri-app exec tauri ios build --target aarch64-sim
 
   # # ============================================
   # # Full Build (Tauri)
@@ -285,6 +403,8 @@ jobs:
       - frontend-typecheck
       - frontend-lint
       - frontend-build
+      # - android-build
+      - ios-build
       # - tauri-build
     steps:
       - name: Check all jobs passed
