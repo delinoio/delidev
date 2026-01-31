@@ -433,6 +433,7 @@ export const RpcMethods = {
 
   // Repository methods
   ADD_REPOSITORY: "addRepository",
+  ADD_REPOSITORY_BY_URL: "addRepositoryByUrl",
   GET_REPOSITORY: "getRepository",
   LIST_REPOSITORIES: "listRepositories",
   REMOVE_REPOSITORY: "removeRepository",
@@ -541,6 +542,11 @@ export interface AddRepositoryRequest {
   localPath: string;
   defaultBranch?: string;
   vcsProviderType?: string;
+}
+
+export interface AddRepositoryByUrlRequest {
+  remoteUrl: string;
+  defaultBranch?: string;
 }
 
 export interface AddRepositoryResponse {

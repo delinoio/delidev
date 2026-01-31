@@ -97,11 +97,82 @@ export function Onboarding() {
   const [defaultBranch, setDefaultBranch] = useState("main");
   const [isAddingRepo, setIsAddingRepo] = useState(false);
   const [addRepoError, setAddRepoError] = useState<string | null>(null);
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+  const [branchValidationError, setBranchValidationError] = useState<string | null>(null);
   const [repoInfo, setRepoInfo] = useState<{
     name: string;
     remote: string;
     branch: string;
   } | null>(null);
+
+  // Client-side validation functions
+  const validateUrl = (url: string): string | null => {
+    if (!url.trim()) {
+      return null; // Empty is allowed, will be caught on submit
+    }
+
+    // Check for dangerous patterns
+    if (url.includes("..") || url.includes("\0") || url.includes("\n")) {
+      return "URL contains invalid characters";
+    }
+
+    // Check for supported schemes
+    const isHttps = url.startsWith("https://");
+    const isHttp = url.startsWith("http://");
+    const isSsh = url.startsWith("git@") || url.startsWith("ssh://");
+
+    if (!isHttps && !isHttp && !isSsh) {
+      return "URL must start with https://, http://, git@, or ssh://";
+    }
+
+    // Basic structure validation for HTTPS/HTTP
+    if (isHttps || isHttp) {
+      const withoutScheme = url.replace(/^https?:\/\//, "");
+      if (!withoutScheme.includes("/")) {
+        return "Invalid URL format: expected host/owner/repo";
+      }
+      const parts = withoutScheme.split("/").filter(Boolean);
+      if (parts.length < 2) {
+        return "Invalid URL format: expected host/owner/repo";
+      }
+    }
+
+    // Check for supported providers
+    const urlLower = url.toLowerCase();
+    if (!urlLower.includes("github.com") &&
+        !urlLower.includes("gitlab") &&
+        !urlLower.includes("bitbucket")) {
+      return "Unsupported provider. Supported: GitHub, GitLab, Bitbucket";
+    }
+
+    return null;
+  };
+
+  const validateBranchName = (branch: string): string | null => {
+    if (!branch) {
+      return "Branch name is required";
+    }
+
+    if (branch.startsWith("-") || branch.startsWith(".") ||
+        branch.endsWith(".") || branch.endsWith("/")) {
+      return "Invalid branch name format";
+    }
+
+    if (branch.includes("..") || branch.includes("//") ||
+        branch.includes("@{") || branch.includes("\\") ||
+        branch.includes(" ") || branch.includes("~") ||
+        branch.includes("^") || branch.includes(":") ||
+        branch.includes("?") || branch.includes("*") ||
+        branch.includes("[")) {
+      return "Branch name contains invalid characters";
+    }
+
+    if (branch.length > 255) {
+      return "Branch name is too long (max 255 characters)";
+    }
+
+    return null;
+  };
 
   const handleValidateToken = async () => {
     if (!token) return;
@@ -335,14 +406,21 @@ export function Onboarding() {
                       type="url"
                       value={repositoryUrl}
                       onChange={(e) => {
-                        setRepositoryUrl(e.target.value);
+                        const value = e.target.value;
+                        setRepositoryUrl(value);
                         setAddRepoError(null);
+                        setUrlValidationError(validateUrl(value));
                       }}
                       placeholder="https://github.com/owner/repo"
+                      className={urlValidationError ? "border-destructive" : ""}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the HTTPS or SSH URL of your git repository
-                    </p>
+                    {urlValidationError ? (
+                      <p className="text-xs text-destructive">{urlValidationError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Enter the HTTPS or SSH URL of your git repository
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -351,15 +429,24 @@ export function Onboarding() {
                       id="default-branch"
                       type="text"
                       value={defaultBranch}
-                      onChange={(e) => setDefaultBranch(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setDefaultBranch(value);
+                        setBranchValidationError(validateBranchName(value));
+                      }}
                       placeholder="main"
+                      className={branchValidationError ? "border-destructive" : ""}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      The main branch of your repository (usually main or master)
-                    </p>
+                    {branchValidationError ? (
+                      <p className="text-xs text-destructive">{branchValidationError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        The main branch of your repository (usually main or master)
+                      </p>
+                    )}
                   </div>
 
-                  {repositoryUrl && (
+                  {repositoryUrl && !urlValidationError && (
                     <div className="rounded-lg border p-4">
                       <div className="flex items-center gap-3">
                         <Link className="h-8 w-8 text-primary" />
@@ -422,7 +509,9 @@ export function Onboarding() {
                   <Button
                     onClick={handleAddRepository}
                     disabled={
-                      (isServerMode ? !repositoryUrl : !selectedPath) || isAddingRepo
+                      (isServerMode
+                        ? !repositoryUrl || !!urlValidationError || !!branchValidationError
+                        : !selectedPath) || isAddingRepo
                     }
                   >
                     {isAddingRepo ? (

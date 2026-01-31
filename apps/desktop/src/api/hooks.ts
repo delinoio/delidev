@@ -25,6 +25,7 @@ import {
   type CreateCompositeTaskResponse,
   type GetCompositeTaskResponse,
   type AddRepositoryRequest,
+  type AddRepositoryByUrlRequest,
   type AddRepositoryResponse,
   type ListRepositoriesResponse,
   type GetExecutionLogsResponse,
@@ -511,6 +512,32 @@ export function useAddRepository() {
       };
       const response = await client.call<AddRepositoryResponse>(
         RpcMethods.ADD_REPOSITORY,
+        request
+      );
+      return response.repository;
+    }
+  }, []);
+
+  return useSimpleMutation(mutationFn);
+}
+
+/**
+ * Adds a repository by URL (for server mode)
+ */
+export function useAddRepositoryByUrl() {
+  type AddParams = { remoteUrl: string; defaultBranch?: string };
+
+  const mutationFn = useCallback(async (params: AddParams): Promise<Repository> => {
+    if (isSingleProcessMode()) {
+      return api.addRepositoryByUrl(params.remoteUrl, params.defaultBranch);
+    } else {
+      const client = getRpcClient();
+      const request: AddRepositoryByUrlRequest = {
+        remoteUrl: params.remoteUrl,
+        defaultBranch: params.defaultBranch,
+      };
+      const response = await client.call<AddRepositoryResponse>(
+        RpcMethods.ADD_REPOSITORY_BY_URL,
         request
       );
       return response.repository;

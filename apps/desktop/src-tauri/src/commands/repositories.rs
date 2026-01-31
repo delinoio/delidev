@@ -98,6 +98,9 @@ pub async fn add_repository_by_url(
     remote_url: String,
     default_branch: Option<String>,
 ) -> Result<Repository, String> {
+    // Validate URL format
+    validate_git_url(&remote_url)?;
+
     // Parse repository info from URL
     let (name, provider) = parse_repository_url(&remote_url)?;
 
@@ -111,6 +114,10 @@ pub async fn add_repository_by_url(
         return Err("Repository already registered".to_string());
     }
 
+    // Validate default branch if provided
+    let branch = default_branch.unwrap_or_else(|| "main".to_string());
+    validate_branch_name(&branch)?;
+
     let repo = Repository::new(
         uuid::Uuid::new_v4().to_string(),
         name,
@@ -118,7 +125,7 @@ pub async fn add_repository_by_url(
         remote_url,
         provider,
     )
-    .with_default_branch(default_branch.unwrap_or_else(|| "main".to_string()));
+    .with_default_branch(branch);
 
     state
         .repository_service
@@ -129,8 +136,111 @@ pub async fn add_repository_by_url(
     Ok(repo)
 }
 
+/// Validates that a URL is a valid git repository URL
+fn validate_git_url(url: &str) -> Result<(), String> {
+    let url = url.trim();
+
+    if url.is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+
+    // Check for common dangerous patterns
+    if url.contains("..") || url.contains('\0') || url.contains('\n') || url.contains('\r') {
+        return Err("URL contains invalid characters".to_string());
+    }
+
+    // Check for supported URL schemes
+    let is_https = url.starts_with("https://");
+    let is_http = url.starts_with("http://");
+    let is_ssh = url.starts_with("git@") || url.starts_with("ssh://");
+
+    if !is_https && !is_http && !is_ssh {
+        return Err(
+            "Invalid URL scheme. Supported schemes: https://, http://, git@, ssh://".to_string(),
+        );
+    }
+
+    // Basic URL structure validation for HTTPS/HTTP
+    if is_https || is_http {
+        // URL should have a host and path
+        let without_scheme = if is_https {
+            url.strip_prefix("https://").unwrap()
+        } else {
+            url.strip_prefix("http://").unwrap()
+        };
+
+        if without_scheme.is_empty() || !without_scheme.contains('/') {
+            return Err("Invalid URL format: missing host or path".to_string());
+        }
+
+        // Check for minimum path components (host/owner/repo)
+        let parts: Vec<&str> = without_scheme
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
+        if parts.len() < 2 {
+            return Err("Invalid URL format: expected host/owner/repo".to_string());
+        }
+    }
+
+    // Basic validation for SSH URLs
+    if is_ssh {
+        if url.starts_with("git@") {
+            // git@host:owner/repo format
+            if !url.contains(':') || !url.contains('/') {
+                return Err("Invalid SSH URL format: expected git@host:owner/repo".to_string());
+            }
+        } else {
+            // ssh://git@host/owner/repo format
+            let without_scheme = url.strip_prefix("ssh://").unwrap();
+            if without_scheme.is_empty() || without_scheme.split('/').count() < 3 {
+                return Err("Invalid SSH URL format".to_string());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validates that a branch name is valid
+fn validate_branch_name(branch: &str) -> Result<(), String> {
+    if branch.is_empty() {
+        return Err("Branch name cannot be empty".to_string());
+    }
+
+    // Git branch name validation rules
+    if branch.starts_with('-')
+        || branch.starts_with('.')
+        || branch.ends_with('.')
+        || branch.ends_with('/')
+        || branch.contains("..")
+        || branch.contains("//")
+        || branch.contains("@{")
+        || branch.contains('\\')
+        || branch.contains('\0')
+        || branch.contains(' ')
+        || branch.contains('~')
+        || branch.contains('^')
+        || branch.contains(':')
+        || branch.contains('?')
+        || branch.contains('*')
+        || branch.contains('[')
+    {
+        return Err("Invalid branch name: contains disallowed characters or patterns".to_string());
+    }
+
+    // Check for reasonable length
+    if branch.len() > 255 {
+        return Err("Branch name is too long (max 255 characters)".to_string());
+    }
+
+    Ok(())
+}
+
 /// Parses a git repository URL and extracts name and provider
 fn parse_repository_url(url: &str) -> Result<(String, VCSProviderType), String> {
+    let url = url.trim();
+
     // Detect provider from URL
     let provider = Repository::detect_provider_from_url(url).ok_or(
         "Could not detect VCS provider from URL. Supported providers: GitHub, GitLab, Bitbucket",
@@ -140,18 +250,28 @@ fn parse_repository_url(url: &str) -> Result<(String, VCSProviderType), String> 
     // Handles formats like:
     // - https://github.com/owner/repo.git
     // - https://github.com/owner/repo
+    // - https://github.com/owner/repo/
     // - git@github.com:owner/repo.git
-    let name = url
-        .trim_end_matches(".git")
-        .split('/')
-        .next_back()
-        .or_else(|| {
-            // Handle SSH format: git@github.com:owner/repo.git
-            url.trim_end_matches(".git")
-                .split(':')
-                .next_back()
-                .and_then(|s| s.split('/').next_back())
-        })
+    // - ssh://git@github.com/owner/repo.git
+
+    // First, clean up the URL: remove trailing slashes and .git suffix
+    let cleaned = url.trim_end_matches('/').trim_end_matches(".git");
+
+    // Try to extract from HTTPS/HTTP URLs first
+    let name = if cleaned.contains("://") {
+        // HTTPS/HTTP or ssh:// URL format
+        cleaned.split('/').filter(|s| !s.is_empty()).next_back()
+    } else if cleaned.contains(':') {
+        // SSH format: git@github.com:owner/repo
+        cleaned
+            .split(':')
+            .next_back()
+            .and_then(|path| path.split('/').filter(|s| !s.is_empty()).next_back())
+    } else {
+        None
+    };
+
+    let name = name
         .ok_or("Could not extract repository name from URL")?
         .to_string();
 
@@ -199,6 +319,8 @@ pub struct RepositoryInfo {
 
 /// Lists files in a repository for autocomplete
 /// Uses git ls-files to get tracked files, respecting .gitignore
+/// Note: This command only works for repositories with a local path.
+/// For repositories added via URL (server mode), this will return an error.
 #[tauri::command]
 pub async fn list_repository_files(
     state: State<'_, Arc<AppState>>,
@@ -212,6 +334,16 @@ pub async fn list_repository_files(
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Repository not found".to_string())?;
+
+    // Check if repository has a local path (not available for URL-only
+    // repositories)
+    if repo.local_path.is_empty() {
+        return Err(
+            "Repository does not have a local path. File listing is not available for \
+             repositories added via URL."
+                .to_string(),
+        );
+    }
 
     let repo_path = PathBuf::from(&repo.local_path);
     if !repo_path.exists() {
@@ -276,4 +408,178 @@ pub async fn list_repository_files(
     files.truncate(limit);
 
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod validate_git_url {
+        use super::*;
+
+        #[test]
+        fn test_accepts_valid_https_urls() {
+            assert!(validate_git_url("https://github.com/owner/repo").is_ok());
+            assert!(validate_git_url("https://github.com/owner/repo.git").is_ok());
+            assert!(validate_git_url("https://gitlab.com/owner/repo").is_ok());
+            assert!(validate_git_url("https://bitbucket.org/owner/repo").is_ok());
+        }
+
+        #[test]
+        fn test_accepts_valid_ssh_urls() {
+            assert!(validate_git_url("git@github.com:owner/repo.git").is_ok());
+            assert!(validate_git_url("git@gitlab.com:owner/repo.git").is_ok());
+            assert!(validate_git_url("ssh://git@github.com/owner/repo.git").is_ok());
+        }
+
+        #[test]
+        fn test_rejects_empty_url() {
+            assert!(validate_git_url("").is_err());
+            assert!(validate_git_url("   ").is_err());
+        }
+
+        #[test]
+        fn test_rejects_invalid_scheme() {
+            assert!(validate_git_url("ftp://github.com/owner/repo").is_err());
+            assert!(validate_git_url("file:///path/to/repo").is_err());
+            assert!(validate_git_url("github.com/owner/repo").is_err());
+        }
+
+        #[test]
+        fn test_rejects_dangerous_patterns() {
+            assert!(validate_git_url("https://github.com/../etc/passwd").is_err());
+            assert!(validate_git_url("https://github.com/owner/repo\0name").is_err());
+            assert!(validate_git_url("https://github.com/owner\n/repo").is_err());
+            assert!(validate_git_url("https://github.com/owner\r/repo").is_err());
+        }
+
+        #[test]
+        fn test_rejects_incomplete_https_urls() {
+            assert!(validate_git_url("https://").is_err());
+            assert!(validate_git_url("https://github.com").is_err());
+            assert!(validate_git_url("https://github.com/").is_err());
+        }
+
+        #[test]
+        fn test_rejects_invalid_ssh_urls() {
+            assert!(validate_git_url("git@github.com").is_err());
+            assert!(validate_git_url("git@github.com:owner").is_err());
+        }
+    }
+
+    mod validate_branch_name {
+        use super::*;
+
+        #[test]
+        fn test_accepts_valid_branch_names() {
+            assert!(validate_branch_name("main").is_ok());
+            assert!(validate_branch_name("master").is_ok());
+            assert!(validate_branch_name("feature/new-feature").is_ok());
+            assert!(validate_branch_name("fix-123").is_ok());
+            assert!(validate_branch_name("release-v1.0.0").is_ok());
+        }
+
+        #[test]
+        fn test_rejects_empty_branch_name() {
+            assert!(validate_branch_name("").is_err());
+        }
+
+        #[test]
+        fn test_rejects_invalid_branch_names() {
+            assert!(validate_branch_name("-feature").is_err());
+            assert!(validate_branch_name(".hidden").is_err());
+            assert!(validate_branch_name("branch.").is_err());
+            assert!(validate_branch_name("branch/").is_err());
+            assert!(validate_branch_name("branch..name").is_err());
+            assert!(validate_branch_name("branch//name").is_err());
+            assert!(validate_branch_name("branch@{name}").is_err());
+            assert!(validate_branch_name("branch\\name").is_err());
+            assert!(validate_branch_name("branch name").is_err());
+            assert!(validate_branch_name("branch~name").is_err());
+            assert!(validate_branch_name("branch^name").is_err());
+            assert!(validate_branch_name("branch:name").is_err());
+            assert!(validate_branch_name("branch?name").is_err());
+            assert!(validate_branch_name("branch*name").is_err());
+            assert!(validate_branch_name("branch[name").is_err());
+        }
+
+        #[test]
+        fn test_rejects_too_long_branch_name() {
+            let long_name = "a".repeat(256);
+            assert!(validate_branch_name(&long_name).is_err());
+        }
+    }
+
+    mod parse_repository_url {
+        use super::*;
+
+        #[test]
+        fn test_parses_https_github_urls() {
+            let (name, provider) = parse_repository_url("https://github.com/owner/repo").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_parses_https_github_urls_with_git_suffix() {
+            let (name, provider) =
+                parse_repository_url("https://github.com/owner/repo.git").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_parses_https_github_urls_with_trailing_slash() {
+            let (name, provider) = parse_repository_url("https://github.com/owner/repo/").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_parses_https_gitlab_urls() {
+            let (name, provider) = parse_repository_url("https://gitlab.com/owner/repo").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitLab);
+        }
+
+        #[test]
+        fn test_parses_https_bitbucket_urls() {
+            let (name, provider) =
+                parse_repository_url("https://bitbucket.org/owner/repo").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::Bitbucket);
+        }
+
+        #[test]
+        fn test_parses_ssh_github_urls() {
+            let (name, provider) = parse_repository_url("git@github.com:owner/repo.git").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_parses_ssh_protocol_urls() {
+            let (name, provider) =
+                parse_repository_url("ssh://git@github.com/owner/repo.git").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_handles_whitespace() {
+            let (name, provider) =
+                parse_repository_url("  https://github.com/owner/repo  ").unwrap();
+            assert_eq!(name, "repo");
+            assert_eq!(provider, VCSProviderType::GitHub);
+        }
+
+        #[test]
+        fn test_rejects_unknown_provider() {
+            let result = parse_repository_url("https://custom-git.example.com/owner/repo");
+            assert!(result.is_err());
+            assert!(result
+                .unwrap_err()
+                .contains("Could not detect VCS provider"));
+        }
+    }
 }
