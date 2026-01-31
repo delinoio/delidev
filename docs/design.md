@@ -594,6 +594,36 @@ enum TtyInputStatus {
 }
 ```
 
+### TokenUsage
+
+Token usage information for an agent session, captured from AI agent execution results.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| id | string | Y | Unique identifier |
+| sessionId | string | Y | Associated AgentSession ID |
+| costUsd | number | N | Execution cost in USD |
+| durationMs | number | N | Total execution duration in milliseconds |
+| durationApiMs | number | N | API call duration in milliseconds |
+| numTurns | number | N | Number of conversation turns |
+| isError | boolean | Y | Whether the execution resulted in an error |
+| createdAt | timestamp | Y | When the usage was recorded |
+
+Token usage is automatically extracted from Claude Code's `Result` message when execution completes. It can be queried per session, per UnitTask (aggregated across all sessions), or per CompositeTask (aggregated across all sub-tasks).
+
+#### Token Usage Aggregation
+
+The system provides aggregated token usage summaries:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| totalCostUsd | number | Sum of costs across all sessions |
+| totalDurationMs | number | Sum of execution durations |
+| totalDurationApiMs | number | Sum of API call durations |
+| totalNumTurns | number | Sum of conversation turns |
+| sessionCount | number | Number of sessions included |
+| errorCount | number | Number of sessions that resulted in errors |
+
 ---
 
 ## Configuration

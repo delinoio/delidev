@@ -457,3 +457,48 @@ pub fn todo_item_status_to_string(status: TodoItemStatus) -> &'static str {
         TodoItemStatus::Dismissed => "dismissed",
     }
 }
+
+/// Database row for TokenUsage
+#[derive(Debug, FromRow)]
+pub struct TokenUsageRow {
+    pub id: String,
+    pub session_id: String,
+    pub cost_usd: Option<f64>,
+    pub duration_ms: Option<f64>,
+    pub duration_api_ms: Option<f64>,
+    pub num_turns: Option<i64>,
+    pub is_error: i32,
+    pub created_at: String,
+}
+
+impl From<TokenUsageRow> for TokenUsage {
+    fn from(row: TokenUsageRow) -> Self {
+        TokenUsage {
+            id: row.id,
+            session_id: row.session_id,
+            cost_usd: row.cost_usd,
+            duration_ms: row.duration_ms,
+            duration_api_ms: row.duration_api_ms,
+            num_turns: row.num_turns.map(|n| n as u32),
+            is_error: row.is_error != 0,
+            created_at: chrono::DateTime::parse_from_rfc3339(&row.created_at)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now()),
+        }
+    }
+}
+
+impl From<&TokenUsage> for TokenUsageRow {
+    fn from(usage: &TokenUsage) -> Self {
+        Self {
+            id: usage.id.clone(),
+            session_id: usage.session_id.clone(),
+            cost_usd: usage.cost_usd,
+            duration_ms: usage.duration_ms,
+            duration_api_ms: usage.duration_api_ms,
+            num_turns: usage.num_turns.map(|n| n as i64),
+            is_error: if usage.is_error { 1 } else { 0 },
+            created_at: usage.created_at.to_rfc3339(),
+        }
+    }
+}

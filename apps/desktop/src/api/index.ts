@@ -922,3 +922,59 @@ export async function getKnownSecretKeys(): Promise<string[]> {
   return invoke("get_known_secret_keys");
 }
 
+// ========== Token Usage API ==========
+
+/**
+ * Token usage information for an agent session
+ */
+export interface TokenUsage {
+  id: string;
+  session_id: string;
+  cost_usd?: number;
+  duration_ms?: number;
+  duration_api_ms?: number;
+  num_turns?: number;
+  is_error: boolean;
+  created_at: string;
+}
+
+/**
+ * Aggregated token usage summary
+ */
+export interface TokenUsageSummary {
+  total_cost_usd: number;
+  total_duration_ms: number;
+  total_duration_api_ms: number;
+  total_num_turns: number;
+  session_count: number;
+  error_count: number;
+}
+
+/**
+ * Gets token usage records for a unit task
+ */
+export async function getUnitTaskTokenUsage(id: string): Promise<TokenUsage[]> {
+  return invoke("get_unit_task_token_usage", { id });
+}
+
+/**
+ * Gets token usage records for a composite task
+ */
+export async function getCompositeTaskTokenUsage(id: string): Promise<TokenUsage[]> {
+  return invoke("get_composite_task_token_usage", { id });
+}
+
+/**
+ * Gets aggregated token usage summary for a unit task
+ */
+export async function getUnitTaskTokenUsageSummary(id: string): Promise<TokenUsageSummary> {
+  return invoke("get_unit_task_token_usage_summary", { id });
+}
+
+/**
+ * Gets aggregated token usage summary for a composite task
+ */
+export async function getCompositeTaskTokenUsageSummary(id: string): Promise<TokenUsageSummary> {
+  return invoke("get_composite_task_token_usage_summary", { id });
+}
+

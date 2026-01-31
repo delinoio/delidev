@@ -1012,6 +1012,7 @@ The graph automatically positions nodes using topological sorting to ensure depe
 | Stop Execution | Stop button to cancel running AI agent execution (UnitTask) |
 | Git Diff Viewer | Shows git diff of changes made by AI agent when task is in review (uses `@pierre/diffs`) |
 | Branch Rename | Edit button to rename the branch for UnitTasks before execution starts |
+| Token Usage Card | Displays aggregated token usage statistics (cost, duration, turns, sessions) for completed tasks |
 
 ## TTY Input Dialog
 

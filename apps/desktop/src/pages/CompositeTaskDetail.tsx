@@ -36,7 +36,7 @@ import {
 import { CompositeTaskStatus, UnitTaskStatus, type CompositeTask, type AgentTask, type UnitTask } from "../types";
 import * as api from "../api";
 import type { ExecutionLog } from "../api";
-import { StreamRenderer, type StreamEntry } from "../components/execution";
+import { StreamRenderer, type StreamEntry, TokenUsageCard } from "../components/execution";
 import { TaskGraphVisualization } from "../components/graph";
 import { useTabsStore } from "../stores/tabs";
 import { CollapsibleText } from "../components/ui/collapsible-text";
@@ -919,6 +919,12 @@ export function CompositeTaskDetail() {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {/* Token Usage Card - Show for in_progress and done tasks */}
+      {(task.status === CompositeTaskStatus.InProgress ||
+        task.status === CompositeTaskStatus.Done) && (
+        <TokenUsageCard taskId={task.id} taskType="composite" />
       )}
 
       {/* Task Nodes */}

@@ -48,7 +48,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import type { ExecutionLog, ClaudeStreamEvent, TtyInputRequest } from "../api";
-import { StreamRenderer, type StreamEntry, TtyInputDialog } from "../components/execution";
+import { StreamRenderer, type StreamEntry, TtyInputDialog, TokenUsageCard } from "../components/execution";
 import { DiffViewer, ReviewSubmitDialog } from "../components/diff";
 import { RequestChangesDialog } from "../components/tasks";
 import { Select } from "../components/ui/select";
@@ -1156,6 +1156,9 @@ export function UnitTaskDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Token Usage Card */}
+      <TokenUsageCard taskId={task.id} taskType="unit" />
 
       {/* Review Submit Dialog */}
       {task.status === UnitTaskStatus.InReview && (

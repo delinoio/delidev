@@ -128,6 +128,11 @@ pub fn run() {
             commands::remove_repository_from_group,
             commands::get_or_create_single_repo_group,
             commands::list_repository_group_files,
+            // Token usage commands
+            commands::get_unit_task_token_usage,
+            commands::get_composite_task_token_usage,
+            commands::get_unit_task_token_usage_summary,
+            commands::get_composite_task_token_usage_summary,
             // Update commands
             commands::check_for_update,
             commands::download_and_install_update,

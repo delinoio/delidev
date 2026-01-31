@@ -6,7 +6,7 @@ use crate::{
     database::composite_task_status_to_string,
     entities::{
         AIAgentType, AgentTask, BaseRemote, CompositeTask, CompositeTaskStatus, ExecutionLog,
-        MergeStrategy, Repository, UnitTask, UnitTaskStatus, VCSProviderType,
+        MergeStrategy, Repository, TokenUsage, UnitTask, UnitTaskStatus, VCSProviderType,
     },
     services::{AppState, ConcurrencyError},
 };
@@ -2576,6 +2576,121 @@ pub async fn execute_composite_task_nodes(
     );
 
     Ok(started_task_ids)
+}
+
+// ========== Token Usage Commands ==========
+
+/// Gets token usage for a unit task
+#[tauri::command]
+pub async fn get_unit_task_token_usage(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Vec<TokenUsage>, String> {
+    validate_task_id(&id)?;
+
+    state
+        .task_service
+        .get_token_usage_for_unit_task(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets token usage for a composite task
+#[tauri::command]
+pub async fn get_composite_task_token_usage(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Vec<TokenUsage>, String> {
+    validate_task_id(&id)?;
+
+    state
+        .task_service
+        .get_token_usage_for_composite_task(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Gets aggregated token usage summary for a unit task
+#[tauri::command]
+pub async fn get_unit_task_token_usage_summary(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<TokenUsageSummary, String> {
+    validate_task_id(&id)?;
+
+    let usages = state
+        .task_service
+        .get_token_usage_for_unit_task(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(aggregate_token_usage(&usages))
+}
+
+/// Gets aggregated token usage summary for a composite task
+#[tauri::command]
+pub async fn get_composite_task_token_usage_summary(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<TokenUsageSummary, String> {
+    validate_task_id(&id)?;
+
+    let usages = state
+        .task_service
+        .get_token_usage_for_composite_task(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(aggregate_token_usage(&usages))
+}
+
+/// Token usage summary (aggregated from multiple sessions)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TokenUsageSummary {
+    /// Total cost in USD
+    pub total_cost_usd: f64,
+    /// Total execution duration in milliseconds
+    pub total_duration_ms: f64,
+    /// Total API duration in milliseconds
+    pub total_duration_api_ms: f64,
+    /// Total number of conversation turns
+    pub total_num_turns: u32,
+    /// Number of sessions included
+    pub session_count: u32,
+    /// Number of failed sessions
+    pub error_count: u32,
+}
+
+/// Aggregates token usage from multiple sessions
+fn aggregate_token_usage(usages: &[TokenUsage]) -> TokenUsageSummary {
+    let mut summary = TokenUsageSummary {
+        total_cost_usd: 0.0,
+        total_duration_ms: 0.0,
+        total_duration_api_ms: 0.0,
+        total_num_turns: 0,
+        session_count: usages.len() as u32,
+        error_count: 0,
+    };
+
+    for usage in usages {
+        if let Some(cost) = usage.cost_usd {
+            summary.total_cost_usd += cost;
+        }
+        if let Some(duration) = usage.duration_ms {
+            summary.total_duration_ms += duration;
+        }
+        if let Some(api_duration) = usage.duration_api_ms {
+            summary.total_duration_api_ms += api_duration;
+        }
+        if let Some(turns) = usage.num_turns {
+            summary.total_num_turns += turns;
+        }
+        if usage.is_error {
+            summary.error_count += 1;
+        }
+    }
+
+    summary
 }
 
 #[cfg(test)]

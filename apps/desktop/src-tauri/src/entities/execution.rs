@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -127,6 +128,90 @@ impl ExecutionLog {
             LogLevel::Warn,
             message,
         )
+    }
+}
+
+// ========== Token Usage ==========
+
+/// Token usage information for an agent session
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsage {
+    /// Unique identifier
+    pub id: String,
+    /// Agent session ID
+    pub session_id: String,
+    /// Cost in USD
+    pub cost_usd: Option<f64>,
+    /// Execution duration in milliseconds
+    pub duration_ms: Option<f64>,
+    /// API call duration in milliseconds
+    pub duration_api_ms: Option<f64>,
+    /// Number of conversation turns
+    pub num_turns: Option<u32>,
+    /// Whether the execution resulted in an error
+    pub is_error: bool,
+    /// Timestamp when the usage was recorded
+    pub created_at: DateTime<Utc>,
+}
+
+impl TokenUsage {
+    pub fn new(session_id: String) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id,
+            cost_usd: None,
+            duration_ms: None,
+            duration_api_ms: None,
+            num_turns: None,
+            is_error: false,
+            created_at: Utc::now(),
+        }
+    }
+
+    pub fn with_cost(mut self, cost_usd: f64) -> Self {
+        self.cost_usd = Some(cost_usd);
+        self
+    }
+
+    pub fn with_duration(mut self, duration_ms: f64) -> Self {
+        self.duration_ms = Some(duration_ms);
+        self
+    }
+
+    pub fn with_api_duration(mut self, duration_api_ms: f64) -> Self {
+        self.duration_api_ms = Some(duration_api_ms);
+        self
+    }
+
+    pub fn with_num_turns(mut self, num_turns: u32) -> Self {
+        self.num_turns = Some(num_turns);
+        self
+    }
+
+    pub fn with_error(mut self, is_error: bool) -> Self {
+        self.is_error = is_error;
+        self
+    }
+
+    /// Creates a TokenUsage from a Claude stream result message
+    pub fn from_claude_result(
+        session_id: String,
+        cost_usd: Option<f64>,
+        duration_ms: Option<f64>,
+        duration_api_ms: Option<f64>,
+        num_turns: Option<u32>,
+        is_error: bool,
+    ) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id,
+            cost_usd,
+            duration_ms,
+            duration_api_ms,
+            num_turns,
+            is_error,
+            created_at: Utc::now(),
+        }
     }
 }
 

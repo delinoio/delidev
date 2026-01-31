@@ -7,11 +7,11 @@ use crate::{
     database::{
         ai_agent_type_to_string, composite_task_status_to_string, unit_task_status_to_string,
         AgentSessionRow, AgentTaskRow, BaseRemoteRow, CompositeTaskNodeRow, CompositeTaskRow,
-        Database, DatabaseResult, UnitTaskRow,
+        Database, DatabaseResult, TokenUsageRow, UnitTaskRow,
     },
     entities::{
-        AgentSession, AgentTask, CompositeTask, CompositeTaskNode, CompositeTaskStatus, UnitTask,
-        UnitTaskStatus,
+        AgentSession, AgentTask, CompositeTask, CompositeTaskNode, CompositeTaskStatus, TokenUsage,
+        UnitTask, UnitTaskStatus,
     },
 };
 
@@ -917,6 +917,7 @@ impl TaskService {
     // ========== Agent Stream Message Operations ==========
 
     /// Saves an agent stream message to the database
+    /// Also extracts and saves token usage if the message is a Result message
     pub async fn save_stream_message(
         &self,
         session_id: &str,
@@ -938,7 +939,43 @@ impl TaskService {
         .execute(self.db.pool())
         .await?;
 
+        // Extract and save token usage if this is a Result message
+        if let Some(token_usage) = self.extract_token_usage(session_id, message) {
+            if let Err(e) = self.save_token_usage(&token_usage).await {
+                tracing::error!("Failed to save token usage: {}", e);
+            }
+        }
+
         Ok(())
+    }
+
+    /// Extracts token usage from a stream message if applicable
+    fn extract_token_usage(
+        &self,
+        session_id: &str,
+        message: &crate::entities::AgentStreamMessage,
+    ) -> Option<TokenUsage> {
+        match message {
+            crate::entities::AgentStreamMessage::ClaudeCode(
+                crate::entities::ClaudeStreamMessage::Result {
+                    cost_usd,
+                    duration_ms,
+                    duration_api_ms,
+                    num_turns,
+                    is_error,
+                    ..
+                },
+            ) => Some(TokenUsage::from_claude_result(
+                session_id.to_string(),
+                *cost_usd,
+                *duration_ms,
+                *duration_api_ms,
+                *num_turns,
+                *is_error,
+            )),
+            // TODO: Add OpenCode token usage extraction when supported
+            _ => None,
+        }
     }
 
     /// Gets all agent stream messages for a session
@@ -1043,6 +1080,107 @@ impl TaskService {
         }
 
         Ok(logs)
+    }
+
+    // ========== Token Usage Operations ==========
+
+    /// Saves token usage information for a session
+    pub async fn save_token_usage(&self, usage: &TokenUsage) -> DatabaseResult<()> {
+        sqlx::query(
+            "INSERT INTO token_usage (id, session_id, cost_usd, duration_ms, duration_api_ms, \
+             num_turns, is_error, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&usage.id)
+        .bind(&usage.session_id)
+        .bind(usage.cost_usd)
+        .bind(usage.duration_ms)
+        .bind(usage.duration_api_ms)
+        .bind(usage.num_turns.map(|n| n as i64))
+        .bind(if usage.is_error { 1 } else { 0 })
+        .bind(usage.created_at.to_rfc3339())
+        .execute(self.db.pool())
+        .await?;
+
+        Ok(())
+    }
+
+    /// Gets token usage for a session
+    pub async fn get_token_usage_for_session(
+        &self,
+        session_id: &str,
+    ) -> DatabaseResult<Option<TokenUsage>> {
+        let row: Option<TokenUsageRow> = sqlx::query_as(
+            "SELECT id, session_id, cost_usd, duration_ms, duration_api_ms, num_turns, is_error, \
+             created_at
+             FROM token_usage
+             WHERE session_id = ?
+             ORDER BY created_at DESC
+             LIMIT 1",
+        )
+        .bind(session_id)
+        .fetch_optional(self.db.pool())
+        .await?;
+
+        Ok(row.map(|r| r.into()))
+    }
+
+    /// Gets aggregated token usage for an agent task (sum of all sessions)
+    pub async fn get_token_usage_for_agent_task(
+        &self,
+        agent_task_id: &str,
+    ) -> DatabaseResult<Vec<TokenUsage>> {
+        let rows: Vec<TokenUsageRow> = sqlx::query_as(
+            "SELECT tu.id, tu.session_id, tu.cost_usd, tu.duration_ms, tu.duration_api_ms, \
+             tu.num_turns, tu.is_error, tu.created_at
+             FROM token_usage tu
+             INNER JOIN agent_sessions sess ON tu.session_id = sess.id
+             WHERE sess.agent_task_id = ?
+             ORDER BY tu.created_at ASC",
+        )
+        .bind(agent_task_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+
+    /// Gets aggregated token usage for a unit task
+    pub async fn get_token_usage_for_unit_task(
+        &self,
+        unit_task_id: &str,
+    ) -> DatabaseResult<Vec<TokenUsage>> {
+        // First get the agent task ID for this unit task
+        let unit_task = match self.get_unit_task(unit_task_id).await? {
+            Some(t) => t,
+            None => return Ok(Vec::new()),
+        };
+
+        self.get_token_usage_for_agent_task(&unit_task.agent_task_id)
+            .await
+    }
+
+    /// Gets aggregated token usage for a composite task (sum across all unit
+    /// tasks)
+    pub async fn get_token_usage_for_composite_task(
+        &self,
+        composite_task_id: &str,
+    ) -> DatabaseResult<Vec<TokenUsage>> {
+        let rows: Vec<TokenUsageRow> = sqlx::query_as(
+            "SELECT tu.id, tu.session_id, tu.cost_usd, tu.duration_ms, tu.duration_api_ms, \
+             tu.num_turns, tu.is_error, tu.created_at
+             FROM token_usage tu
+             INNER JOIN agent_sessions sess ON tu.session_id = sess.id
+             INNER JOIN unit_tasks ut ON sess.agent_task_id = ut.agent_task_id
+             INNER JOIN composite_task_nodes ctn ON ut.id = ctn.unit_task_id
+             WHERE ctn.composite_task_id = ?
+             ORDER BY tu.created_at ASC",
+        )
+        .bind(composite_task_id)
+        .fetch_all(self.db.pool())
+        .await?;
+
+        Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
     /// Gets the set of blocked unit task IDs.
