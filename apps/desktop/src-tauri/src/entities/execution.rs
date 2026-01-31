@@ -195,6 +195,9 @@ pub enum ClaudeStreamMessage {
         subtype: String,
         #[serde(default)]
         cost_usd: Option<f64>,
+        /// Total cost in USD for the session (Claude Code uses this field)
+        #[serde(default)]
+        total_cost_usd: Option<f64>,
         #[serde(default)]
         duration_ms: Option<f64>,
         #[serde(default)]
@@ -209,13 +212,33 @@ pub enum ClaudeStreamMessage {
         session_id: Option<String>,
         #[serde(default)]
         parent_tool_use_id: Option<String>,
-        /// Total input tokens used in the session
+        /// Total input tokens used in the session (legacy field)
         #[serde(default)]
         total_input_tokens: Option<u64>,
-        /// Total output tokens used in the session
+        /// Total output tokens used in the session (legacy field)
         #[serde(default)]
         total_output_tokens: Option<u64>,
+        /// Token usage object from Claude Code (preferred)
+        #[serde(default)]
+        usage: Option<ClaudeUsage>,
     },
+}
+
+/// Token usage information from Claude Code stream-json output
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ClaudeUsage {
+    /// Input tokens used
+    #[serde(default)]
+    pub input_tokens: Option<u64>,
+    /// Output tokens used
+    #[serde(default)]
+    pub output_tokens: Option<u64>,
+    /// Cache read input tokens
+    #[serde(default)]
+    pub cache_read_input_tokens: Option<u64>,
+    /// Cache creation input tokens
+    #[serde(default)]
+    pub cache_creation_input_tokens: Option<u64>,
 }
 
 /// OpenCode JSON message format

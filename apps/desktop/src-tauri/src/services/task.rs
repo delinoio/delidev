@@ -1064,34 +1064,48 @@ impl TaskService {
             if let crate::entities::AgentStreamMessage::ClaudeCode(
                 crate::entities::ClaudeStreamMessage::Result {
                     cost_usd,
+                    total_cost_usd,
                     total_input_tokens,
                     total_output_tokens,
+                    usage,
                     ..
                 },
             ) = &entry.message
             {
-                let input_tokens = total_input_tokens.unwrap_or(0);
-                let output_tokens = total_output_tokens.unwrap_or(0);
+                // Get token counts from either the usage object (preferred) or legacy fields
+                let input_tokens = usage
+                    .as_ref()
+                    .and_then(|u| u.input_tokens)
+                    .or(*total_input_tokens)
+                    .unwrap_or(0);
+                let output_tokens = usage
+                    .as_ref()
+                    .and_then(|u| u.output_tokens)
+                    .or(*total_output_tokens)
+                    .unwrap_or(0);
 
-                // Only save if we have any token data
-                if input_tokens > 0 || output_tokens > 0 || cost_usd.is_some() {
-                    let usage = crate::entities::SessionUsage::new(
+                // Get cost from total_cost_usd (preferred) or cost_usd (legacy)
+                let cost = total_cost_usd.or(*cost_usd);
+
+                // Only save if we have any token data or cost
+                if input_tokens > 0 || output_tokens > 0 || cost.is_some() {
+                    let session_usage = crate::entities::SessionUsage::new(
                         session_id.to_string(),
                         input_tokens,
                         output_tokens,
-                        *cost_usd,
+                        cost,
                         model,
                     );
 
-                    self.save_session_usage(&usage).await?;
+                    self.save_session_usage(&session_usage).await?;
                     tracing::info!(
                         "Saved session usage for {}: {} input tokens, {} output tokens, cost: {:?}",
                         session_id,
                         input_tokens,
                         output_tokens,
-                        cost_usd
+                        cost
                     );
-                    return Ok(Some(usage));
+                    return Ok(Some(session_usage));
                 }
             }
         }
