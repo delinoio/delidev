@@ -1,5 +1,7 @@
 //! Worker registration and management
 
+#![allow(dead_code)]
+
 use std::{
     collections::HashMap,
     time::{Duration, Instant},

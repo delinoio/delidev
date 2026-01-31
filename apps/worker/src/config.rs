@@ -1,7 +1,8 @@
 //! Worker configuration
 
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 
 /// Worker configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,7 +176,9 @@ impl WorkerConfig {
 
     /// Get the worker ID (always returns a value after load)
     pub fn worker_id(&self) -> &str {
-        self.worker_id.as_deref().expect("Worker ID should be set after load")
+        self.worker_id
+            .as_deref()
+            .expect("Worker ID should be set after load")
     }
 }
 

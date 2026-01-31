@@ -1,12 +1,12 @@
 //! Client for communication with the main server
 
-use std::collections::HashMap;
+#![allow(dead_code)]
 
 use coding_agents::NormalizedMessage;
 use rpc_protocol::{
-    JsonRpcRequest, JsonRpcResponse, RegisterWorkerRequest,
-    RegisterWorkerResponse, ReportTaskCompleteRequest, SendExecutionLogRequest,
-    SuccessResponse, WorkerCapacity, WorkerHeartbeatRequest, WorkerHeartbeatResponse, WorkerLoad,
+    JsonRpcRequest, JsonRpcResponse, RegisterWorkerRequest, RegisterWorkerResponse,
+    ReportTaskCompleteRequest, SendExecutionLogRequest, SuccessResponse, WorkerCapacity,
+    WorkerHeartbeatRequest, WorkerHeartbeatResponse, WorkerLoad,
 };
 use thiserror::Error;
 use tracing::debug;
@@ -139,11 +139,8 @@ impl MainServerClient {
             exit_code,
         };
 
-        self.call(
-            "reportTaskComplete",
-            serde_json::to_value(request).unwrap(),
-        )
-        .await
+        self.call("reportTaskComplete", serde_json::to_value(request).unwrap())
+            .await
     }
 
     /// Send execution log to the main server
@@ -159,11 +156,8 @@ impl MainServerClient {
             message,
         };
 
-        self.call(
-            "sendExecutionLog",
-            serde_json::to_value(request).unwrap(),
-        )
-        .await
+        self.call("sendExecutionLog", serde_json::to_value(request).unwrap())
+            .await
     }
 
     /// Check server health

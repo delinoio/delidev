@@ -12,8 +12,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use tokio::net::TcpListener;
-use tokio::signal;
+use tokio::{net::TcpListener, signal};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,

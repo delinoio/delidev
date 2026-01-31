@@ -1,6 +1,6 @@
 //! Authentication middleware
 
-use std::sync::Arc;
+#![allow(dead_code)]
 
 use auth::{AuthenticatedUser, JwtAuth};
 use axum::{
@@ -21,7 +21,9 @@ pub async fn auth_middleware(
 ) -> Result<Response, StatusCode> {
     // Skip auth if not configured (single process mode)
     if state.auth.is_none() {
-        request.extensions_mut().insert::<Option<AuthenticatedUser>>(None);
+        request
+            .extensions_mut()
+            .insert::<Option<AuthenticatedUser>>(None);
         return Ok(next.run(request).await);
     }
 
@@ -55,8 +57,10 @@ pub async fn auth_middleware(
 }
 
 /// Extract authenticated user from request extensions
-pub async fn extract_user(
-    request: Request,
-) -> Option<AuthenticatedUser> {
-    request.extensions().get::<Option<AuthenticatedUser>>().cloned().flatten()
+pub async fn extract_user(request: Request) -> Option<AuthenticatedUser> {
+    request
+        .extensions()
+        .get::<Option<AuthenticatedUser>>()
+        .cloned()
+        .flatten()
 }

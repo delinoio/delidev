@@ -1,12 +1,16 @@
 //! Application state
 
+#![allow(dead_code)]
+
 use std::sync::Arc;
 
 use auth::JwtAuth;
 use task_store::{MemoryStore, TaskStore};
 use tokio::sync::RwLock;
 
-use crate::{config::ServerConfig, log_broadcaster::LogBroadcaster, worker_registry::WorkerRegistry};
+use crate::{
+    config::ServerConfig, log_broadcaster::LogBroadcaster, worker_registry::WorkerRegistry,
+};
 
 /// Application state shared across handlers
 #[derive(Clone)]

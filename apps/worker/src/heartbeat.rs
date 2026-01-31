@@ -97,11 +97,7 @@ impl HeartbeatService {
         let running_tasks = self.executor.running_task_count().await as u32;
 
         // Calculate CPU usage (average across all cores)
-        let cpu_usage = system
-            .cpus()
-            .iter()
-            .map(|cpu| cpu.cpu_usage())
-            .sum::<f32>()
+        let cpu_usage = system.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>()
             / system.cpus().len() as f32;
 
         // Calculate memory usage

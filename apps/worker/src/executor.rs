@@ -1,5 +1,7 @@
 //! Task execution
 
+#![allow(dead_code)]
+
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use coding_agents::{
@@ -43,10 +45,10 @@ pub struct TaskExecutor {
 }
 
 /// An active task session
+#[allow(dead_code)]
 struct TaskSession {
     task_id: String,
     session_id: String,
-    #[allow(dead_code)]
     cancel_tx: tokio::sync::oneshot::Sender<()>,
 }
 
@@ -178,10 +180,10 @@ impl TaskExecutor {
         let env = secrets::inject_secrets_to_env(assignment.secrets.clone());
 
         // Build execution context
-        let mut context = ExecutionContext::new(worktree_path.clone()).with_env(env);
+        let mut _context = ExecutionContext::new(worktree_path.clone()).with_env(env);
 
         if let Some(ref model) = assignment.model {
-            context = context.with_model(model);
+            _context = _context.with_model(model);
         }
 
         if self.config.use_container {
@@ -201,7 +203,7 @@ impl TaskExecutor {
             for (key, value) in &assignment.secrets {
                 sandbox_config = sandbox_config.with_env(key, value);
             }
-            context = context.with_sandbox(sandbox_config);
+            _context = _context.with_sandbox(sandbox_config);
         }
 
         // For now, simulate execution since we don't have actual agent implementations

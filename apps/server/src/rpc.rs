@@ -8,16 +8,14 @@ use rpc_protocol::{
     CreateUnitTaskResponse, GetCompositeTaskRequest, GetCompositeTaskResponse,
     GetExecutionLogsRequest, GetExecutionLogsResponse, GetUnitTaskRequest, GetUnitTaskResponse,
     JsonRpcError, JsonRpcRequest, JsonRpcResponse, ListRepositoriesRequest,
-    ListRepositoriesResponse, ListUnitTasksRequest, ListUnitTasksResponse,
-    RegisterWorkerRequest, RegisterWorkerResponse, RejectCompositePlanRequest,
-    ReportTaskCompleteRequest, SendExecutionLogRequest, SendSecretsRequest, SendSecretsResponse,
-    StartTaskExecutionRequest, StartTaskExecutionResponse, StopTaskExecutionRequest,
-    SuccessResponse, UpdateUnitTaskStatusRequest, WorkerHeartbeatRequest,
-    WorkerHeartbeatResponse,
+    ListRepositoriesResponse, ListUnitTasksRequest, ListUnitTasksResponse, RegisterWorkerRequest,
+    RegisterWorkerResponse, RejectCompositePlanRequest, ReportTaskCompleteRequest,
+    SendExecutionLogRequest, SendSecretsRequest, SendSecretsResponse, StartTaskExecutionRequest,
+    StartTaskExecutionResponse, StopTaskExecutionRequest, SuccessResponse,
+    UpdateUnitTaskStatusRequest, WorkerHeartbeatRequest, WorkerHeartbeatResponse,
 };
 use task_store::{
-    CompositeTask, CompositeTaskStatus, Repository, TaskFilter,
-    UnitTask, UnitTaskStatus,
+    CompositeTask, CompositeTaskStatus, Repository, TaskFilter, UnitTask, UnitTaskStatus,
 };
 use tracing::info;
 
@@ -28,8 +26,8 @@ pub async fn handle_rpc(
     State(state): State<AppState>,
     Json(request): Json<JsonRpcRequest>,
 ) -> (StatusCode, Json<JsonRpcResponse>) {
-    // In a full implementation, we would extract the user from the Authorization header
-    // For now, skip auth in single-user mode
+    // In a full implementation, we would extract the user from the Authorization
+    // header For now, skip auth in single-user mode
     let user: Option<AuthenticatedUser> = None;
 
     let response = match dispatch_method(&state, &user, &request).await {
@@ -142,7 +140,9 @@ async fn dispatch_method(
 }
 
 /// Parse JSON-RPC params
-fn parse_params<T: serde::de::DeserializeOwned>(params: &serde_json::Value) -> Result<T, JsonRpcError> {
+fn parse_params<T: serde::de::DeserializeOwned>(
+    params: &serde_json::Value,
+) -> Result<T, JsonRpcError> {
     serde_json::from_value(params.clone()).map_err(|e| JsonRpcError::invalid_params(e.to_string()))
 }
 
@@ -375,11 +375,7 @@ async fn handle_add_repository(
     state: &AppState,
     params: AddRepositoryRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
-    let repo = Repository::new(
-        &params.name,
-        &params.remote_url,
-        &params.local_path,
-    );
+    let repo = Repository::new(&params.name, &params.remote_url, &params.local_path);
 
     state
         .store
@@ -413,7 +409,8 @@ async fn handle_get_execution_logs(
     _state: &AppState,
     _params: GetExecutionLogsRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
-    // For now, return empty logs (would be stored in database in full implementation)
+    // For now, return empty logs (would be stored in database in full
+    // implementation)
     let response = GetExecutionLogsResponse { logs: Vec::new() };
     serde_json::to_value(response).map_err(|e| JsonRpcError::internal_error(e.to_string()))
 }

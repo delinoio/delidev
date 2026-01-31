@@ -1,7 +1,8 @@
 //! Server configuration
 
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 
 /// Server configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,7 +151,8 @@ impl ServerConfig {
         if let Some(config_path) = Self::find_config_file() {
             if let Ok(contents) = std::fs::read_to_string(&config_path) {
                 if let Ok(file_config) = toml::from_str::<ServerConfig>(&contents) {
-                    // Merge file config (file takes precedence over defaults, env takes precedence over file)
+                    // Merge file config (file takes precedence over defaults, env takes precedence
+                    // over file)
                     if config.bind_address == default_bind_address() {
                         config.bind_address = file_config.bind_address;
                     }

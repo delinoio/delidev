@@ -143,8 +143,10 @@ async fn handle_message(
         }
 
         method => {
-            let response =
-                JsonRpcResponse::error(request.id, rpc_protocol::JsonRpcError::method_not_found(method));
+            let response = JsonRpcResponse::error(
+                request.id,
+                rpc_protocol::JsonRpcError::method_not_found(method),
+            );
             let json = serde_json::to_string(&response).unwrap();
             let _ = tx.send(Message::Text(json.into())).await;
         }

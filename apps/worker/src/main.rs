@@ -7,8 +7,7 @@
 
 use std::sync::Arc;
 
-use tokio::signal;
-use tokio::sync::watch;
+use tokio::{signal, sync::watch};
 use tracing::{error, info, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 

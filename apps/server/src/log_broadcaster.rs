@@ -1,5 +1,7 @@
 //! Log broadcasting for real-time execution streaming
 
+#![allow(dead_code)]
+
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
@@ -131,8 +133,9 @@ impl TaskLogHandle {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::Utc;
+
+    use super::*;
 
     #[test]
     fn test_subscribe_and_broadcast() {
