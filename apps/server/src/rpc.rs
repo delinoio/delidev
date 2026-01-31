@@ -39,7 +39,10 @@ pub async fn handle_rpc(
 }
 
 /// Dispatch a method call to the appropriate handler
-async fn dispatch_method(
+///
+/// This function is public so it can be reused by the embedded server
+/// in single-process mode without duplicating the dispatch logic.
+pub async fn dispatch_method(
     state: &AppState,
     user: &Option<AuthenticatedUser>,
     request: &JsonRpcRequest,

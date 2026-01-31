@@ -13,5 +13,6 @@ pub mod worker_registry;
 
 pub use config::ServerConfig;
 pub use log_broadcaster::LogBroadcaster;
+pub use rpc::dispatch_method;
 pub use state::AppState;
 pub use worker_registry::WorkerRegistry;

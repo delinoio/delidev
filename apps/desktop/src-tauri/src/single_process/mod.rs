@@ -15,11 +15,11 @@ mod config;
 mod embedded_server;
 mod embedded_worker;
 
+use std::sync::Arc;
+
 pub use config::{ProcessMode, SingleProcessConfig};
 pub use embedded_server::EmbeddedServer;
 pub use embedded_worker::EmbeddedWorker;
-
-use std::sync::Arc;
 
 /// The combined single-process runtime that includes embedded server and worker
 pub struct SingleProcessRuntime {

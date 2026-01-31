@@ -94,8 +94,9 @@ impl EmbeddedWorker {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use task_store::MemoryStore;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_embedded_worker_creation() {
