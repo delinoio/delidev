@@ -159,6 +159,51 @@ Each AgentSession runs in an isolated Docker container:
 4. **Human-in-the-Loop**: Code review gate before PR creation (AI slop prevention)
 5. **Automation with Control**: Auto-fix features can be toggled on/off
 
+### Distributed Architecture (Optional)
+
+DeliDev supports an optional distributed mode for remote execution:
+
+```
+                                ┌─────────────────────────────────┐
+                                │         Main Server             │
+                                │  (Task Management, RPC Server)  │
+                                │                                 │
+                                │  ┌─────────────────────────────┐│
+                                │  │      PostgreSQL / SQLite    ││
+                                │  │      (multi/single mode)    ││
+                                │  └─────────────────────────────┘│
+                                │                                 │
+                                │  JWT Auth (OpenID Connect)      │
+                                └─────────────┬───────────────────┘
+                                              │
+                       JSON-RPC over HTTP/WebSocket
+                                              │
+                ┌─────────────────────────────┼─────────────────────────────┐
+                │                             │                             │
+                ▼                             ▼                             ▼
+    ┌───────────────────┐       ┌───────────────────┐       ┌───────────────────┐
+    │   Worker Server   │       │   Worker Server   │       │      Client       │
+    │                   │       │                   │       │  (Desktop/Mobile) │
+    │  ┌─────────────┐  │       │  ┌─────────────┐  │       │                   │
+    │  │Claude Code  │  │       │  │Claude Code  │  │       │  React + Tauri    │
+    │  │OpenCode     │  │       │  │OpenCode     │  │       │  react-query      │
+    │  │Aider, etc.  │  │       │  │Aider, etc.  │  │       │                   │
+    │  └─────────────┘  │       │  └─────────────┘  │       │  Keychain Access  │
+    │                   │       │                   │       │  (macOS, etc.)    │
+    │  Docker Sandbox   │       │  Docker Sandbox   │       │                   │
+    └───────────────────┘       └───────────────────┘       └───────────────────┘
+```
+
+**Components:**
+
+- **Main Server (`apps/server`)**: Task management, worker coordination, JWT authentication
+- **Worker Server (`apps/worker`)**: AI agent execution, Docker sandboxing, heartbeat reporting
+- **Client**: Desktop/mobile app connecting via JSON-RPC
+
+**Single Process Mode:**
+
+In single-process mode, the desktop app embeds all components (server + worker) for a seamless local experience with no network overhead.
+
 ---
 
 ## Technology Stack
@@ -172,12 +217,25 @@ Each AgentSession runs in an isolated Docker container:
 ### Backend (Rust)
 | Crate | Purpose |
 |-------|---------|
-| sqlx | Async SQLite driver |
+| sqlx | Async SQLite/PostgreSQL driver |
 | bollard | Docker API client |
 | git2 | Git operations |
-| reqwest | HTTP client for VCS APIs |
+| reqwest | HTTP client for VCS/RPC APIs |
 | serde | Serialization |
 | tokio | Async runtime |
+| axum | Web server framework |
+| jsonwebtoken | JWT authentication |
+
+### Shared Crates
+
+| Crate | Purpose |
+|-------|---------|
+| coding_agents | AI agent abstraction & Docker sandboxing |
+| task_store | Task storage (SQLite, PostgreSQL, in-memory) |
+| rpc_protocol | JSON-RPC 2.0 protocol definitions |
+| git_ops | Git operations & worktree management |
+| auth | JWT authentication & RBAC |
+| secrets | Cross-platform keychain access |
 
 ### Frontend (React + TypeScript)
 | Package | Purpose |
