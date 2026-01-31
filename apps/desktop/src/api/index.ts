@@ -138,6 +138,19 @@ export async function addRepositoryByUrl(
   remoteUrl: string,
   defaultBranch?: string
 ): Promise<Repository> {
+  // Check if we're in remote mode - if so, use RPC client
+  const { getClientMode } = await import("./hooks");
+  if (getClientMode() === "remote") {
+    const { getRpcClient, RpcMethods } = await import("./rpc");
+    const client = getRpcClient();
+    const response = await client.call<{ repository: Repository }>(
+      RpcMethods.ADD_REPOSITORY_BY_URL,
+      { remoteUrl, defaultBranch }
+    );
+    return response.repository;
+  }
+
+  // In single-process mode, use Tauri invoke
   return invoke("add_repository_by_url", { remoteUrl, defaultBranch });
 }
 
