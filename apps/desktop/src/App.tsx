@@ -11,6 +11,11 @@ import { useRepositoriesStore } from "./stores/repositories";
 import { Loader2 } from "lucide-react";
 import { useNotificationClickHandler } from "./hooks/useNotificationClickHandler";
 import { hasModeBeenSelected, clearModeSelection } from "./pages/ModeSelection";
+import {
+  shouldSkipModeSelection,
+  getEnvConfig,
+  initializeClient,
+} from "./api/client-config";
 
 // Lazy-loaded page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -43,9 +48,19 @@ function AppContent() {
       return;
     }
 
-    // In dev mode, always show mode selection on each start
+    // Check if mode is configured via environment variables
+    const envConfig = getEnvConfig();
+    if (envConfig && shouldSkipModeSelection()) {
+      // Initialize client with env config and skip mode selection
+      initializeClient();
+      setModeSelected(true);
+      return;
+    }
+
+    // In dev mode without explicit env config, show mode selection on each start
     // This allows developers to test both Local and Server modes easily
-    if (import.meta.env.DEV) {
+    // Use PUBLIC_SKIP_MODE_SELECTION=true to skip in dev mode
+    if (import.meta.env.DEV && !shouldSkipModeSelection()) {
       clearModeSelection();
       setModeSelected(false);
       return;

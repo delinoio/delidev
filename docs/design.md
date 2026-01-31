@@ -1602,3 +1602,28 @@ Key variables for development:
 | `DATABASE_URL` | PostgreSQL connection URL (multi-user mode) |
 | `DELIDEV_LOG_LEVEL` | Log level: trace, debug, info, warn, error |
 
+### Desktop App Development
+
+The desktop app (`apps/desktop`) supports different development modes:
+
+| Script | Description |
+|--------|-------------|
+| `pnpm dev` | Default dev mode with mode selection screen on each start |
+| `pnpm dev:local` | Skip mode selection, use local/single-process mode |
+| `pnpm dev:remote` | Skip mode selection (requires `PUBLIC_REMOTE_SERVER_URL`) |
+
+#### Frontend Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `PUBLIC_DEFAULT_MODE` | Default mode: `local` or `remote` |
+| `PUBLIC_REMOTE_SERVER_URL` | Remote server URL (required for remote mode) |
+| `PUBLIC_SKIP_MODE_SELECTION` | Set to `true` to skip mode selection screen |
+
+Example for remote development:
+```bash
+PUBLIC_DEFAULT_MODE=remote PUBLIC_REMOTE_SERVER_URL=http://localhost:54871 PUBLIC_SKIP_MODE_SELECTION=true pnpm dev
+# Or use the shorthand:
+PUBLIC_REMOTE_SERVER_URL=http://localhost:54871 pnpm dev:remote
+```
+
