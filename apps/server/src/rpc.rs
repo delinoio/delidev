@@ -1,7 +1,5 @@
 //! JSON-RPC request handling
 
-#![allow(unused_imports)]
-
 use auth::AuthenticatedUser;
 use axum::{extract::State, http::StatusCode, Json};
 use rpc_protocol::{
@@ -16,7 +14,7 @@ use rpc_protocol::{
     StartTaskExecutionResponse, StopTaskExecutionRequest, SuccessResponse,
     UpdateUnitTaskStatusRequest, WorkerHeartbeatRequest, WorkerHeartbeatResponse,
 };
-use secrets;
+use secrets::SecretPayload;
 use task_store::{
     CompositeTask, CompositeTaskStatus, Repository, TaskFilter, UnitTask, UnitTaskStatus,
 };
@@ -426,7 +424,7 @@ async fn handle_send_secrets(
     params: SendSecretsRequest,
 ) -> Result<serde_json::Value, JsonRpcError> {
     // Create a secret payload
-    let payload = secrets::SecretPayload::new(params.task_id.clone(), params.secrets.clone());
+    let payload = SecretPayload::new(params.task_id.clone(), params.secrets.clone());
 
     // Validate the payload timestamp
     if !payload.is_valid_timestamp() {

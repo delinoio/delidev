@@ -52,6 +52,7 @@ pub struct TaskSecretStore {
     secrets: HashMap<String, SecretPayload>,
 }
 
+#[allow(dead_code)]
 impl TaskSecretStore {
     /// Create a new task secret store
     pub fn new() -> Self {
