@@ -12,6 +12,9 @@ settingGroups:
     base:
       PRODUCT_NAME: DeliDev
       PRODUCT_BUNDLE_IDENTIFIER: com.delidev.app
+      CODE_SIGN_STYLE: Automatic
+      # For CI: Set DEVELOPMENT_TEAM env var or configure in Xcode
+      DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
 targetTemplates:
   app:
     type: application

@@ -93,6 +93,8 @@ jobs:
       - name: Build iOS (Release)
         if: github.event_name == 'push' || inputs.upload_to_testflight
         working-directory: apps/desktop
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
         run: pnpm tauri ios build --export-method app-store-connect
 
       # Upload to TestFlight
