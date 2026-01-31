@@ -293,6 +293,11 @@ jobs:
         with:
           xcode-version: '16.2'
 
+      - name: Install iOS Simulator runtime
+        run: |
+          xcodebuild -downloadPlatform iOS
+          xcrun simctl list runtimes
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
