@@ -1,1 +1,12 @@
-gen/
+# Ignore auto-generated schemas
+gen/schemas/
+
+# iOS build artifacts (committed project files are in gen/apple/)
+gen/apple/build/
+gen/apple/Externals/
+gen/apple/xcuserdata/
+gen/apple/Podfile.lock
+gen/apple/Pods/
+
+# Android (if added later)
+gen/android/
