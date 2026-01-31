@@ -38,6 +38,7 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
 }
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl From<sqlx::Error> for StoreError {
     fn from(err: sqlx::Error) -> Self {
         match err {

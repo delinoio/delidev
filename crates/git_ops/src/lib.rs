@@ -2,22 +2,43 @@
 //!
 //! This crate provides git operations extracted from the desktop app,
 //! making them available for use in the worker server and other components.
+//!
+//! Note: On mobile platforms (Android/iOS), git operations are not available
+//! and stub implementations are provided.
 
+// Desktop implementation with git2
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod branch;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod diff;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod error;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod worktree;
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use std::path::Path;
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use branch::*;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use diff::*;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use error::*;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use worktree::*;
 
+// Mobile stub implementation
+#[cfg(any(target_os = "android", target_os = "ios"))]
+mod mobile_stub;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+pub use mobile_stub::*;
+
 /// Main service for git operations
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub struct GitOperations;
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl GitOperations {
     /// Opens a repository at the given path
     pub fn open_repo(repo_path: &Path) -> GitResult<git2::Repository> {
@@ -103,6 +124,7 @@ impl GitOperations {
 }
 
 /// Repository information
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[derive(Debug, Clone)]
 pub struct RepoInfo {
     /// Repository name

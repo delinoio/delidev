@@ -5,11 +5,14 @@ edition = "2021"
 description = "Git operations for DeliDev including worktree management"
 
 [dependencies]
-git2 = "0.19"
 regex = "1"
 thiserror = "2"
 tracing = "0.1"
 uuid = { version = "1", features = ["v4"] }
+
+# git2 is only available on desktop platforms
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+git2 = "0.19"
 
 [dev-dependencies]
 tempfile = "3"
