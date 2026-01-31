@@ -247,6 +247,23 @@ In single-process mode, the desktop app embeds all components (server + worker) 
 | shadcn/ui | Component library |
 | zustand | State management |
 
+### Frontend API Layer
+
+The frontend includes a flexible API layer that supports both single-process mode (Tauri invoke) and remote client mode (JSON-RPC):
+
+| Module | Purpose |
+|--------|---------|
+| `api/rpc.ts` | JSON-RPC 2.0 client for server communication |
+| `api/hooks.ts` | React hooks for data fetching (works in both modes) |
+| `api/client-config.ts` | Client mode configuration management |
+| `api/ClientProvider.tsx` | React context provider for client state |
+
+**Mode Switching:**
+- **Single Process Mode**: Uses Tauri `invoke()` commands directly. No network overhead.
+- **Remote Mode**: Uses JSON-RPC over HTTP/WebSocket to communicate with remote server.
+
+The hooks automatically detect the current mode and route API calls appropriately.
+
 ### Supported Platforms
 - Windows (x64, arm64)
 - macOS (x64, arm64)
