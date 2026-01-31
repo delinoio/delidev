@@ -66,10 +66,10 @@ impl RemoteUrl {
 /// Parses a URL into protocol, host, and path components.
 fn parse_url_parts(url: &str) -> (String, String, String) {
     // Handle SSH URLs (git@host:path)
-    if let Some(rest) = url.strip_prefix("git@") {
-        if let Some((host, path)) = rest.split_once(':') {
-            return ("ssh".to_string(), host.to_string(), path.to_string());
-        }
+    if let Some(rest) = url.strip_prefix("git@")
+        && let Some((host, path)) = rest.split_once(':')
+    {
+        return ("ssh".to_string(), host.to_string(), path.to_string());
     }
 
     // Handle HTTPS/HTTP URLs

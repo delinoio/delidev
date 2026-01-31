@@ -24,7 +24,7 @@ pub enum GitCredentials {
 }
 
 /// Options for cloning a repository.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CloneOptions {
     /// Branch to checkout.
     pub branch: Option<String>,
@@ -34,17 +34,6 @@ pub struct CloneOptions {
     pub bare: bool,
     /// Clone depth (None for full clone).
     pub depth: Option<u32>,
-}
-
-impl Default for CloneOptions {
-    fn default() -> Self {
-        Self {
-            branch: None,
-            credentials: None,
-            bare: false,
-            depth: None,
-        }
-    }
 }
 
 /// Options for fetching from a remote.
