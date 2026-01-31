@@ -40,6 +40,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             // System commands
             commands::check_docker,
@@ -124,6 +125,9 @@ pub fn run() {
             commands::remove_repository_from_group,
             commands::get_or_create_single_repo_group,
             commands::list_repository_group_files,
+            // Update commands
+            commands::check_for_update,
+            commands::download_and_install_update,
         ])
         .setup(|app| {
             // Initialize tracing with Sentry integration
