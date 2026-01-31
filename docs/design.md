@@ -771,7 +771,116 @@ ENV PATH="/tmp/npm-global/bin:/root/.cargo/bin:${PATH}"
 
 ## Authentication
 
-DeliDev requires authentication for VCS providers. AI agent authentication uses locally stored credentials from tools like Claude Code.
+DeliDev supports multiple authentication mechanisms depending on the deployment mode.
+
+### Server Authentication (Multi-User Mode)
+
+In multi-user mode, the server requires authentication for all API requests. Authentication is handled via JWT tokens.
+
+#### JWT Authentication
+
+The server uses JWT (JSON Web Tokens) for API authentication:
+
+- Tokens are issued after successful OIDC authentication
+- Tokens include user ID, email, and name claims
+- Default expiration: 24 hours (configurable via `DELIDEV_JWT_EXPIRATION_HOURS`)
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DELIDEV_JWT_SECRET` | Secret key for signing JWTs | (required in multi-user mode) |
+| `DELIDEV_JWT_EXPIRATION_HOURS` | Token expiration in hours | 24 |
+| `DELIDEV_JWT_ISSUER` | JWT issuer claim | "delidev" |
+
+#### OpenID Connect (OIDC)
+
+The server supports OIDC for user authentication with any standard OIDC provider (Google, GitHub, Keycloak, etc.).
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `DELIDEV_OIDC_ISSUER_URL` | OIDC provider issuer URL (e.g., `https://accounts.google.com`) |
+| `DELIDEV_OIDC_CLIENT_ID` | OAuth2 client ID |
+| `DELIDEV_OIDC_CLIENT_SECRET` | OAuth2 client secret |
+| `DELIDEV_OIDC_REDIRECT_URL` | Redirect URL after authentication |
+| `DELIDEV_OIDC_SCOPES` | Comma-separated scopes (default: `openid,email,profile`) |
+| `DELIDEV_ALLOWED_REDIRECT_ORIGINS` | Comma-separated list of allowed redirect origins (supports wildcards like `*.example.com`) |
+
+**Security Features:**
+
+- **PKCE (Proof Key for Code Exchange)**: S256 challenge method for enhanced security
+- **CSRF Protection**: State parameter validation with automatic expiration (10 minutes)
+- **Database-backed State Storage**: Authorization states are stored in PostgreSQL (multi-user) or SQLite (single-user) for production reliability
+- **Redirect URI Validation**: Prevents open redirect vulnerabilities by validating against an allowlist
+- **Timeout Protection**: OIDC metadata discovery has a 30-second timeout to prevent startup hangs
+
+**Authentication Flow:**
+
+```
+┌─────────────────┐
+│  Client         │
+│  GET /auth/login│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Server returns │
+│  auth_url       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  User redirected│
+│  to OIDC provider│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  User authenticates│
+│  with provider  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Redirect to    │
+│  /auth/callback │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Server exchanges│
+│  code for tokens │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Server issues  │
+│  JWT to client  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Client uses JWT│
+│  for API requests│
+└─────────────────┘
+```
+
+**Auth Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/auth/status` | GET | Check if auth is enabled |
+| `/auth/login` | GET | Initiate OIDC login flow |
+| `/auth/callback` | GET | OIDC callback handler |
+| `/auth/token/refresh` | POST | Refresh access token |
+| `/auth/me` | GET | Get current user info |
+| `/auth/logout` | POST | Logout (client-side token discard) |
+
+#### Single-User Mode
+
+In single-user mode (`DELIDEV_SINGLE_USER_MODE=true`), authentication is disabled. This mode is intended for local desktop usage where all requests are trusted.
 
 ### VCS Provider Authentication
 

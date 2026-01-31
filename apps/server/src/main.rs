@@ -9,6 +9,7 @@
 use std::time::Duration;
 
 use axum::{
+    middleware as axum_middleware,
     routing::{get, post},
     Router,
 };
@@ -20,6 +21,7 @@ use tower_http::{
 use tracing::{info, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod auth_routes;
 mod config;
 mod log_broadcaster;
 mod middleware;
@@ -88,10 +90,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CorsLayer::new()
     };
 
-    // Build router
-    let app = Router::new()
+    // Build auth routes
+    let auth_router = Router::new()
+        .route("/status", get(auth_routes::auth_status))
+        .route("/login", get(auth_routes::login))
+        .route("/callback", get(auth_routes::callback))
+        .route("/token/refresh", post(auth_routes::refresh_token))
+        .route("/me", get(auth_routes::me))
+        .route("/logout", post(auth_routes::logout));
+
+    // Build protected routes (require auth in multi-user mode)
+    let protected_routes = Router::new()
         .route("/rpc", post(rpc::handle_rpc))
         .route("/ws", get(websocket::handle_websocket))
+        .route_layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            middleware::auth_middleware,
+        ));
+
+    // Build router
+    let app = Router::new()
+        .nest("/auth", auth_router)
+        .merge(protected_routes)
         .route("/health", get(health_check))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -118,6 +138,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             interval.tick().await;
             log_state.log_broadcaster.cleanup_empty_channels();
+        }
+    });
+
+    // Start auth state cleanup task (remove expired OIDC authorization states)
+    let auth_cleanup_state = state.clone();
+    tokio::spawn(async move {
+        // Run cleanup every hour
+        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            // Use the same expiration as AUTH_STATE_EXPIRATION_SECS (10 minutes = 600
+            // seconds)
+            match auth_cleanup_state
+                .auth_state_store
+                .cleanup_expired(600)
+                .await
+            {
+                Ok(count) if count > 0 => {
+                    info!(count = count, "Cleaned up expired auth states");
+                }
+                Ok(_) => {
+                    // No expired states to clean up
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to cleanup expired auth states");
+                }
+            }
         }
     });
 

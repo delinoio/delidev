@@ -1,7 +1,5 @@
 //! Authentication middleware
 
-#![allow(dead_code)]
-
 use auth::{AuthenticatedUser, JwtAuth};
 use axum::{
     extract::{Request, State},
@@ -57,6 +55,7 @@ pub async fn auth_middleware(
 }
 
 /// Extract authenticated user from request extensions
+#[allow(dead_code)]
 pub async fn extract_user(request: Request) -> Option<AuthenticatedUser> {
     request
         .extensions()

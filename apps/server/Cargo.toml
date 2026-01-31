@@ -10,8 +10,11 @@ publish = false
 # Shared crates
 task_store = { path = "../../crates/task_store" }
 rpc_protocol = { path = "../../crates/rpc_protocol" }
-auth = { path = "../../crates/auth" }
+auth = { path = "../../crates/auth", features = ["sqlx"] }
 coding_agents = { path = "../../crates/coding_agents" }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "chrono"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -32,6 +35,12 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# HTTP client (for OIDC)
+reqwest = { version = "0.12", features = ["json"] }
+
+# URL parsing
+url = "2"
 
 # Configuration
 toml = "0.8"
