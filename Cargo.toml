@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "apps/desktop/src-tauri",
+    "apps/server",
+    "apps/worker",
     "crates/coding_agents",
     "crates/task_store",
     "crates/rpc_protocol",
