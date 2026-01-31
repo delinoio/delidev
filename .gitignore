@@ -200,7 +200,6 @@ target
 
 # Tauri
 apps/tauri-app/src-tauri/target
-apps/tauri-app/src-tauri/gen
 apps/tauri-app/dist
 
 .turbo
