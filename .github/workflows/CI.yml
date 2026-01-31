@@ -163,11 +163,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript check (desktop-app)
-        run: pnpm --filter desktop-app exec tsc --noEmit
-
-      - name: TypeScript check (webapp)
-        run: pnpm --filter webapp exec tsc --noEmit
+      - name: TypeScript check (tauri-app)
+        run: pnpm --filter tauri-app exec tsc --noEmit
 
   frontend-lint:
     name: Frontend Lint
