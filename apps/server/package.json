@@ -1,0 +1,7 @@
+{
+  "name": "main-server",
+  "private": true,
+  "scripts": {
+    "dev": "cargo run"
+  }
+}

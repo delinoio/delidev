@@ -124,6 +124,8 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.29)(jsdom@25.0.1)(lightningcss@1.30.2)
 
+  apps/server: {}
+
   apps/webapp:
     dependencies:
       '@polar-sh/nextjs':
@@ -172,6 +174,8 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
+
+  apps/worker: {}
 
 packages:
 
