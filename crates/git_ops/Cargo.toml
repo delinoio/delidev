@@ -1,0 +1,17 @@
+[package]
+name = "git_ops"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Git operations for DeliDev"
+
+[dependencies]
+entities = { path = "../entities" }
+git2 = "0.20"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tracing = "0.1"
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"

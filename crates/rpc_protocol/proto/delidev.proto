@@ -1,0 +1,721 @@
+syntax = "proto3";
+
+package delidev;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Common Types
+// ============================================================================
+
+enum VcsType {
+  VCS_TYPE_UNSPECIFIED = 0;
+  VCS_TYPE_GIT = 1;
+}
+
+enum VcsProviderType {
+  VCS_PROVIDER_TYPE_UNSPECIFIED = 0;
+  VCS_PROVIDER_TYPE_GITHUB = 1;
+  VCS_PROVIDER_TYPE_GITLAB = 2;
+  VCS_PROVIDER_TYPE_BITBUCKET = 3;
+}
+
+enum AiAgentType {
+  AI_AGENT_TYPE_UNSPECIFIED = 0;
+  AI_AGENT_TYPE_CLAUDE_CODE = 1;
+  AI_AGENT_TYPE_OPEN_CODE = 2;
+  AI_AGENT_TYPE_GEMINI_CLI = 3;
+  AI_AGENT_TYPE_CODEX_CLI = 4;
+  AI_AGENT_TYPE_AIDER = 5;
+  AI_AGENT_TYPE_AMP = 6;
+}
+
+enum UnitTaskStatus {
+  UNIT_TASK_STATUS_UNSPECIFIED = 0;
+  UNIT_TASK_STATUS_IN_PROGRESS = 1;
+  UNIT_TASK_STATUS_IN_REVIEW = 2;
+  UNIT_TASK_STATUS_APPROVED = 3;
+  UNIT_TASK_STATUS_PR_OPEN = 4;
+  UNIT_TASK_STATUS_DONE = 5;
+  UNIT_TASK_STATUS_REJECTED = 6;
+}
+
+enum CompositeTaskStatus {
+  COMPOSITE_TASK_STATUS_UNSPECIFIED = 0;
+  COMPOSITE_TASK_STATUS_PLANNING = 1;
+  COMPOSITE_TASK_STATUS_PENDING_APPROVAL = 2;
+  COMPOSITE_TASK_STATUS_IN_PROGRESS = 3;
+  COMPOSITE_TASK_STATUS_DONE = 4;
+  COMPOSITE_TASK_STATUS_REJECTED = 5;
+}
+
+enum TtyInputType {
+  TTY_INPUT_TYPE_UNSPECIFIED = 0;
+  TTY_INPUT_TYPE_TEXT = 1;
+  TTY_INPUT_TYPE_SELECT = 2;
+  TTY_INPUT_TYPE_CONFIRM = 3;
+  TTY_INPUT_TYPE_PASSWORD = 4;
+}
+
+enum TtyInputStatus {
+  TTY_INPUT_STATUS_UNSPECIFIED = 0;
+  TTY_INPUT_STATUS_PENDING = 1;
+  TTY_INPUT_STATUS_RESPONDED = 2;
+  TTY_INPUT_STATUS_TIMEOUT = 3;
+  TTY_INPUT_STATUS_CANCELLED = 4;
+}
+
+enum WorkerStatus {
+  WORKER_STATUS_UNSPECIFIED = 0;
+  WORKER_STATUS_IDLE = 1;
+  WORKER_STATUS_BUSY = 2;
+  WORKER_STATUS_UNHEALTHY = 3;
+}
+
+// ============================================================================
+// Entity Messages
+// ============================================================================
+
+message BaseRemote {
+  string git_remote_dir_path = 1;
+  string git_branch_name = 2;
+}
+
+message AgentSession {
+  string id = 1;
+  string agent_task_id = 2;
+  AiAgentType ai_agent_type = 3;
+  optional string ai_agent_model = 4;
+  optional google.protobuf.Timestamp started_at = 5;
+  optional google.protobuf.Timestamp completed_at = 6;
+  optional string output_log = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message AgentTask {
+  string id = 1;
+  repeated BaseRemote base_remotes = 2;
+  repeated AgentSession agent_sessions = 3;
+  optional AiAgentType ai_agent_type = 4;
+  optional string ai_agent_model = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message UnitTask {
+  string id = 1;
+  string repository_group_id = 2;
+  string agent_task_id = 3;
+  string prompt = 4;
+  optional string title = 5;
+  optional string branch_name = 6;
+  optional string linked_pr_url = 7;
+  optional string base_commit = 8;
+  optional string end_commit = 9;
+  repeated string auto_fix_task_ids = 10;
+  UnitTaskStatus status = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message CompositeTaskNode {
+  string id = 1;
+  string composite_task_id = 2;
+  string unit_task_id = 3;
+  repeated string depends_on_ids = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CompositeTask {
+  string id = 1;
+  string repository_group_id = 2;
+  string planning_task_id = 3;
+  string prompt = 4;
+  optional string title = 5;
+  repeated string node_ids = 6;
+  CompositeTaskStatus status = 7;
+  optional AiAgentType execution_agent_type = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message Repository {
+  string id = 1;
+  string workspace_id = 2;
+  string name = 3;
+  string remote_url = 4;
+  string default_branch = 5;
+  VcsType vcs_type = 6;
+  VcsProviderType vcs_provider_type = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message RepositoryGroup {
+  string id = 1;
+  string workspace_id = 2;
+  optional string name = 3;
+  repeated string repository_ids = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message Workspace {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional string user_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  optional string name = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message TtyInputRequest {
+  string id = 1;
+  string task_id = 2;
+  string session_id = 3;
+  string prompt = 4;
+  TtyInputType input_type = 5;
+  repeated string options = 6;
+  TtyInputStatus status = 7;
+  optional string response = 8;
+  google.protobuf.Timestamp created_at = 9;
+  optional google.protobuf.Timestamp responded_at = 10;
+}
+
+message Worker {
+  string id = 1;
+  string name = 2;
+  string endpoint_url = 3;
+  WorkerStatus status = 4;
+  google.protobuf.Timestamp last_heartbeat = 5;
+  optional string current_task_id = 6;
+  google.protobuf.Timestamp registered_at = 7;
+}
+
+// ============================================================================
+// Task Service
+// ============================================================================
+
+message CreateUnitTaskRequest {
+  string repository_group_id = 1;
+  string prompt = 2;
+  optional string title = 3;
+  optional string branch_name = 4;
+  optional AiAgentType ai_agent_type = 5;
+  optional string ai_agent_model = 6;
+}
+
+message CreateUnitTaskResponse {
+  UnitTask task = 1;
+}
+
+message CreateCompositeTaskRequest {
+  string repository_group_id = 1;
+  string prompt = 2;
+  optional string title = 3;
+  optional AiAgentType execution_agent_type = 4;
+}
+
+message CreateCompositeTaskResponse {
+  CompositeTask task = 1;
+}
+
+message GetTaskRequest {
+  string task_id = 1;
+}
+
+message GetTaskResponse {
+  oneof task {
+    UnitTask unit_task = 1;
+    CompositeTask composite_task = 2;
+  }
+}
+
+message ListTasksRequest {
+  optional string repository_group_id = 1;
+  optional UnitTaskStatus unit_status = 2;
+  optional CompositeTaskStatus composite_status = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListTasksResponse {
+  repeated UnitTask unit_tasks = 1;
+  repeated CompositeTask composite_tasks = 2;
+  int32 total_count = 3;
+}
+
+message UpdateTaskStatusRequest {
+  string task_id = 1;
+  oneof status {
+    UnitTaskStatus unit_status = 2;
+    CompositeTaskStatus composite_status = 3;
+  }
+}
+
+message UpdateTaskStatusResponse {
+  oneof task {
+    UnitTask unit_task = 1;
+    CompositeTask composite_task = 2;
+  }
+}
+
+message DeleteTaskRequest {
+  string task_id = 1;
+}
+
+message DeleteTaskResponse {}
+
+message RetryTaskRequest {
+  string task_id = 1;
+}
+
+message RetryTaskResponse {
+  UnitTask task = 1;
+}
+
+message ApproveTaskRequest {
+  string task_id = 1;
+}
+
+message ApproveTaskResponse {}
+
+message RejectTaskRequest {
+  string task_id = 1;
+  optional string reason = 2;
+}
+
+message RejectTaskResponse {}
+
+message RequestChangesRequest {
+  string task_id = 1;
+  string feedback = 2;
+}
+
+message RequestChangesResponse {
+  UnitTask task = 1;
+}
+
+service TaskService {
+  rpc CreateUnit(CreateUnitTaskRequest) returns (CreateUnitTaskResponse);
+  rpc CreateComposite(CreateCompositeTaskRequest) returns (CreateCompositeTaskResponse);
+  rpc Get(GetTaskRequest) returns (GetTaskResponse);
+  rpc List(ListTasksRequest) returns (ListTasksResponse);
+  rpc UpdateStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse);
+  rpc Delete(DeleteTaskRequest) returns (DeleteTaskResponse);
+  rpc Retry(RetryTaskRequest) returns (RetryTaskResponse);
+  rpc Approve(ApproveTaskRequest) returns (ApproveTaskResponse);
+  rpc Reject(RejectTaskRequest) returns (RejectTaskResponse);
+  rpc RequestChanges(RequestChangesRequest) returns (RequestChangesResponse);
+}
+
+// ============================================================================
+// Session Service
+// ============================================================================
+
+message GetLogRequest {
+  string session_id = 1;
+}
+
+message GetLogResponse {
+  string log = 1;
+}
+
+message StopSessionRequest {
+  string session_id = 1;
+}
+
+message StopSessionResponse {}
+
+message SubmitTtyInputRequest {
+  string request_id = 1;
+  string response = 2;
+}
+
+message SubmitTtyInputResponse {}
+
+service SessionService {
+  rpc GetLog(GetLogRequest) returns (GetLogResponse);
+  rpc Stop(StopSessionRequest) returns (StopSessionResponse);
+  rpc SubmitTtyInput(SubmitTtyInputRequest) returns (SubmitTtyInputResponse);
+}
+
+// ============================================================================
+// Repository Service
+// ============================================================================
+
+message AddRepositoryRequest {
+  string workspace_id = 1;
+  string remote_url = 2;
+  optional string name = 3;
+  optional string default_branch = 4;
+}
+
+message AddRepositoryResponse {
+  Repository repository = 1;
+}
+
+message ListRepositoriesRequest {
+  optional string workspace_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListRepositoriesResponse {
+  repeated Repository repositories = 1;
+  int32 total_count = 2;
+}
+
+message GetRepositoryRequest {
+  string repository_id = 1;
+}
+
+message GetRepositoryResponse {
+  Repository repository = 1;
+}
+
+message RemoveRepositoryRequest {
+  string repository_id = 1;
+}
+
+message RemoveRepositoryResponse {}
+
+message CreateRepositoryGroupRequest {
+  string workspace_id = 1;
+  optional string name = 2;
+  repeated string repository_ids = 3;
+}
+
+message CreateRepositoryGroupResponse {
+  RepositoryGroup group = 1;
+}
+
+message ListRepositoryGroupsRequest {
+  optional string workspace_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message ListRepositoryGroupsResponse {
+  repeated RepositoryGroup groups = 1;
+  int32 total_count = 2;
+}
+
+message UpdateRepositoryGroupRequest {
+  string group_id = 1;
+  optional string name = 2;
+  repeated string repository_ids = 3;
+}
+
+message UpdateRepositoryGroupResponse {
+  RepositoryGroup group = 1;
+}
+
+message DeleteRepositoryGroupRequest {
+  string group_id = 1;
+}
+
+message DeleteRepositoryGroupResponse {}
+
+service RepositoryService {
+  rpc Add(AddRepositoryRequest) returns (AddRepositoryResponse);
+  rpc List(ListRepositoriesRequest) returns (ListRepositoriesResponse);
+  rpc Get(GetRepositoryRequest) returns (GetRepositoryResponse);
+  rpc Remove(RemoveRepositoryRequest) returns (RemoveRepositoryResponse);
+  rpc CreateGroup(CreateRepositoryGroupRequest) returns (CreateRepositoryGroupResponse);
+  rpc ListGroups(ListRepositoryGroupsRequest) returns (ListRepositoryGroupsResponse);
+  rpc UpdateGroup(UpdateRepositoryGroupRequest) returns (UpdateRepositoryGroupResponse);
+  rpc DeleteGroup(DeleteRepositoryGroupRequest) returns (DeleteRepositoryGroupResponse);
+}
+
+// ============================================================================
+// Workspace Service
+// ============================================================================
+
+message CreateWorkspaceRequest {
+  string name = 1;
+  optional string description = 2;
+}
+
+message CreateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message ListWorkspacesRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListWorkspacesResponse {
+  repeated Workspace workspaces = 1;
+  int32 total_count = 2;
+}
+
+message GetWorkspaceRequest {
+  string workspace_id = 1;
+}
+
+message GetWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message UpdateWorkspaceRequest {
+  string workspace_id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message UpdateWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message DeleteWorkspaceRequest {
+  string workspace_id = 1;
+}
+
+message DeleteWorkspaceResponse {}
+
+service WorkspaceService {
+  rpc Create(CreateWorkspaceRequest) returns (CreateWorkspaceResponse);
+  rpc List(ListWorkspacesRequest) returns (ListWorkspacesResponse);
+  rpc Get(GetWorkspaceRequest) returns (GetWorkspaceResponse);
+  rpc Update(UpdateWorkspaceRequest) returns (UpdateWorkspaceResponse);
+  rpc Delete(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse);
+}
+
+// ============================================================================
+// Todo Service
+// ============================================================================
+
+enum TodoItemType {
+  TODO_ITEM_TYPE_UNSPECIFIED = 0;
+  TODO_ITEM_TYPE_ISSUE_TRIAGE = 1;
+  TODO_ITEM_TYPE_PR_REVIEW = 2;
+}
+
+enum TodoItemStatus {
+  TODO_ITEM_STATUS_UNSPECIFIED = 0;
+  TODO_ITEM_STATUS_PENDING = 1;
+  TODO_ITEM_STATUS_IN_PROGRESS = 2;
+  TODO_ITEM_STATUS_COMPLETED = 3;
+  TODO_ITEM_STATUS_DISMISSED = 4;
+}
+
+message IssueTriageData {
+  string issue_url = 1;
+  string issue_title = 2;
+  repeated string suggested_labels = 3;
+  repeated string suggested_assignees = 4;
+}
+
+message PrReviewData {
+  string pr_url = 1;
+  string pr_title = 2;
+  int32 changed_files_count = 3;
+  optional string ai_summary = 4;
+}
+
+message TodoItem {
+  string id = 1;
+  TodoItemType item_type = 2;
+  TodoItemStatus status = 3;
+  string repository_id = 4;
+  oneof data {
+    IssueTriageData issue_triage = 5;
+    PrReviewData pr_review = 6;
+  }
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message ListTodoItemsRequest {
+  optional string repository_id = 1;
+  optional TodoItemStatus status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListTodoItemsResponse {
+  repeated TodoItem items = 1;
+  int32 total_count = 2;
+}
+
+message GetTodoItemRequest {
+  string item_id = 1;
+}
+
+message GetTodoItemResponse {
+  TodoItem item = 1;
+}
+
+message UpdateTodoStatusRequest {
+  string item_id = 1;
+  TodoItemStatus status = 2;
+}
+
+message UpdateTodoStatusResponse {
+  TodoItem item = 1;
+}
+
+message DismissTodoRequest {
+  string item_id = 1;
+}
+
+message DismissTodoResponse {}
+
+service TodoService {
+  rpc List(ListTodoItemsRequest) returns (ListTodoItemsResponse);
+  rpc Get(GetTodoItemRequest) returns (GetTodoItemResponse);
+  rpc UpdateStatus(UpdateTodoStatusRequest) returns (UpdateTodoStatusResponse);
+  rpc Dismiss(DismissTodoRequest) returns (DismissTodoResponse);
+}
+
+// ============================================================================
+// Secrets Service
+// ============================================================================
+
+message Secret {
+  string key = 1;
+  string value = 2;
+}
+
+message SendSecretsRequest {
+  string task_id = 1;
+  repeated Secret secrets = 2;
+}
+
+message SendSecretsResponse {}
+
+message ClearSecretsRequest {
+  string task_id = 1;
+}
+
+message ClearSecretsResponse {}
+
+service SecretsService {
+  rpc Send(SendSecretsRequest) returns (SendSecretsResponse);
+  rpc Clear(ClearSecretsRequest) returns (ClearSecretsResponse);
+}
+
+// ============================================================================
+// Auth Service
+// ============================================================================
+
+message GetLoginUrlRequest {
+  string redirect_uri = 1;
+}
+
+message GetLoginUrlResponse {
+  string login_url = 1;
+}
+
+message HandleCallbackRequest {
+  string code = 1;
+  string state = 2;
+}
+
+message HandleCallbackResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+  User user = 4;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+}
+
+message GetCurrentUserRequest {}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+service AuthService {
+  rpc GetLoginUrl(GetLoginUrlRequest) returns (GetLoginUrlResponse);
+  rpc HandleCallback(HandleCallbackRequest) returns (HandleCallbackResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
+
+// ============================================================================
+// Worker Service (Internal)
+// ============================================================================
+
+message RegisterWorkerRequest {
+  string name = 1;
+  string endpoint_url = 2;
+}
+
+message RegisterWorkerResponse {
+  string worker_id = 1;
+}
+
+message HeartbeatRequest {
+  string worker_id = 1;
+  WorkerStatus status = 2;
+  optional string current_task_id = 3;
+}
+
+message HeartbeatResponse {}
+
+message UnregisterWorkerRequest {
+  string worker_id = 1;
+}
+
+message UnregisterWorkerResponse {}
+
+message GetNextTaskRequest {
+  string worker_id = 1;
+}
+
+message GetNextTaskResponse {
+  optional UnitTask task = 1;
+  optional AgentTask agent_task = 2;
+}
+
+message ReportTaskStatusRequest {
+  string worker_id = 1;
+  string task_id = 1;
+  UnitTaskStatus status = 2;
+  optional string output_log = 3;
+  optional string error = 4;
+}
+
+message ReportTaskStatusResponse {}
+
+message GetSecretsRequest {
+  string worker_id = 1;
+  string task_id = 2;
+}
+
+message GetSecretsResponse {
+  repeated Secret secrets = 1;
+}
+
+service WorkerService {
+  rpc Register(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc Unregister(UnregisterWorkerRequest) returns (UnregisterWorkerResponse);
+  rpc GetNextTask(GetNextTaskRequest) returns (GetNextTaskResponse);
+  rpc ReportTaskStatus(ReportTaskStatusRequest) returns (ReportTaskStatusResponse);
+  rpc GetSecrets(GetSecretsRequest) returns (GetSecretsResponse);
+}
