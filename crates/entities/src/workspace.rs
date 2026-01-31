@@ -54,8 +54,8 @@ mod tests {
 
     #[test]
     fn test_workspace_creation() {
-        let workspace = Workspace::new("My Workspace")
-            .with_description("A workspace for my projects");
+        let workspace =
+            Workspace::new("My Workspace").with_description("A workspace for my projects");
 
         assert_eq!(workspace.name, "My Workspace");
         assert_eq!(

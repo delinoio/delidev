@@ -7,10 +7,11 @@ use uuid::Uuid;
 use crate::AiAgentType;
 
 /// Status of a UnitTask.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UnitTaskStatus {
     /// AI is working.
+    #[default]
     InProgress,
     /// AI work complete, awaiting human review.
     InReview,
@@ -22,12 +23,6 @@ pub enum UnitTaskStatus {
     Done,
     /// Rejected and discarded.
     Rejected,
-}
-
-impl Default for UnitTaskStatus {
-    fn default() -> Self {
-        Self::InProgress
-    }
 }
 
 /// A single task unit visible to users.
@@ -96,10 +91,11 @@ impl UnitTask {
 }
 
 /// Status of a CompositeTask.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CompositeTaskStatus {
     /// Generating PLAN.yaml.
+    #[default]
     Planning,
     /// Waiting for user approval.
     PendingApproval,
@@ -109,12 +105,6 @@ pub enum CompositeTaskStatus {
     Done,
     /// User rejected the plan.
     Rejected,
-}
-
-impl Default for CompositeTaskStatus {
-    fn default() -> Self {
-        Self::Planning
-    }
 }
 
 /// A node in a CompositeTask graph.
@@ -278,10 +268,9 @@ mod tests {
     fn test_composite_task_creation() {
         let repo_group_id = Uuid::new_v4();
         let planning_task_id = Uuid::new_v4();
-        let task =
-            CompositeTask::new(repo_group_id, planning_task_id, "Implement authentication")
-                .with_title("Auth System")
-                .with_execution_agent_type(AiAgentType::ClaudeCode);
+        let task = CompositeTask::new(repo_group_id, planning_task_id, "Implement authentication")
+            .with_title("Auth System")
+            .with_execution_agent_type(AiAgentType::ClaudeCode);
 
         assert_eq!(task.repository_group_id, repo_group_id);
         assert_eq!(task.planning_task_id, planning_task_id);

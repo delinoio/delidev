@@ -34,7 +34,11 @@ impl OidcConfig {
             client_id: client_id.into(),
             client_secret: client_secret.into(),
             redirect_url: redirect_url.into(),
-            scopes: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+            scopes: vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "profile".to_string(),
+            ],
         }
     }
 

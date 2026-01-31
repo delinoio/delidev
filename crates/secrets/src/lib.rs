@@ -2,7 +2,8 @@
 //!
 //! This crate provides:
 //! - Trait-based keychain abstraction
-//! - Native keychain implementations (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+//! - Native keychain implementations (macOS Keychain, Windows Credential
+//!   Manager, Linux Secret Service)
 //! - Known secret key management
 
 mod error;

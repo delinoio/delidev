@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Status of a TodoItem.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoItemStatus {
     /// Pending action.
+    #[default]
     Pending,
     /// In progress.
     InProgress,
@@ -18,26 +19,15 @@ pub enum TodoItemStatus {
     Dismissed,
 }
 
-impl Default for TodoItemStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
-
 /// Source of a TodoItem.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TodoItemSource {
     /// Automatically created.
+    #[default]
     Auto,
     /// Manually created by user.
     Manual,
-}
-
-impl Default for TodoItemSource {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Type of TodoItem.

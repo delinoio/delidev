@@ -1,7 +1,8 @@
 //! Core entity definitions for DeliDev.
 //!
-//! This crate defines all the core data types used across the DeliDev application,
-//! including entities for tasks, repositories, workspaces, and more.
+//! This crate defines all the core data types used across the DeliDev
+//! application, including entities for tasks, repositories, workspaces, and
+//! more.
 
 mod agent;
 mod repository;

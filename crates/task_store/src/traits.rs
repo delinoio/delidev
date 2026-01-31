@@ -108,8 +108,10 @@ pub trait TaskStore: Send + Sync {
     async fn get_workspace(&self, id: Uuid) -> TaskStoreResult<Option<Workspace>>;
 
     /// Lists workspaces with optional filters.
-    async fn list_workspaces(&self, filter: WorkspaceFilter)
-        -> TaskStoreResult<(Vec<Workspace>, u32)>;
+    async fn list_workspaces(
+        &self,
+        filter: WorkspaceFilter,
+    ) -> TaskStoreResult<(Vec<Workspace>, u32)>;
 
     /// Updates a workspace.
     async fn update_workspace(&self, workspace: Workspace) -> TaskStoreResult<Workspace>;
@@ -194,8 +196,7 @@ pub trait TaskStore: Send + Sync {
     async fn get_agent_session(&self, id: Uuid) -> TaskStoreResult<Option<AgentSession>>;
 
     /// Lists agent sessions by agent task ID.
-    async fn list_agent_sessions(&self, agent_task_id: Uuid)
-        -> TaskStoreResult<Vec<AgentSession>>;
+    async fn list_agent_sessions(&self, agent_task_id: Uuid) -> TaskStoreResult<Vec<AgentSession>>;
 
     /// Updates an agent session.
     async fn update_agent_session(&self, session: AgentSession) -> TaskStoreResult<AgentSession>;
@@ -255,10 +256,8 @@ pub trait TaskStore: Send + Sync {
     ) -> TaskStoreResult<CompositeTaskNode>;
 
     /// Gets a composite task node by ID.
-    async fn get_composite_task_node(
-        &self,
-        id: Uuid,
-    ) -> TaskStoreResult<Option<CompositeTaskNode>>;
+    async fn get_composite_task_node(&self, id: Uuid)
+    -> TaskStoreResult<Option<CompositeTaskNode>>;
 
     /// Lists composite task nodes by composite task ID.
     async fn list_composite_task_nodes(

@@ -5,17 +5,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Type of version control system.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VcsType {
     /// Git version control system.
+    #[default]
     Git,
-}
-
-impl Default for VcsType {
-    fn default() -> Self {
-        Self::Git
-    }
 }
 
 /// Type of VCS provider.
@@ -31,10 +26,11 @@ pub enum VcsProviderType {
 }
 
 /// Type of AI coding agent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AiAgentType {
     /// Claude Code - Anthropic's terminal-based agentic coding tool.
+    #[default]
     ClaudeCode,
     /// OpenCode - Open-source Claude Code alternative.
     OpenCode,
@@ -46,12 +42,6 @@ pub enum AiAgentType {
     Aider,
     /// Amp - Sourcegraph's agentic coding CLI.
     Amp,
-}
-
-impl Default for AiAgentType {
-    fn default() -> Self {
-        Self::ClaudeCode
-    }
 }
 
 impl AiAgentType {

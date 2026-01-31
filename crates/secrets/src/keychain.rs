@@ -1,7 +1,6 @@
 //! Keychain trait and implementations.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
@@ -230,7 +229,11 @@ mod tests {
             .unwrap();
 
         let secrets = keychain
-            .get_many(&[SecretKey::AnthropicApiKey, SecretKey::OpenAiApiKey, SecretKey::GithubToken])
+            .get_many(&[
+                SecretKey::AnthropicApiKey,
+                SecretKey::OpenAiApiKey,
+                SecretKey::GithubToken,
+            ])
             .await
             .unwrap();
 
@@ -243,6 +246,6 @@ mod tests {
             secrets.get(&SecretKey::OpenAiApiKey),
             Some(&"openai-key".to_string())
         );
-        assert!(secrets.get(&SecretKey::GithubToken).is_none());
+        assert!(!secrets.contains_key(&SecretKey::GithubToken));
     }
 }

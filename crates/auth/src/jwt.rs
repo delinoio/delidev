@@ -1,7 +1,7 @@
 //! JWT token generation and validation.
 
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -46,9 +46,7 @@ impl Claims {
 
     /// Returns the user ID.
     pub fn user_id(&self) -> AuthResult<Uuid> {
-        self.sub
-            .parse()
-            .map_err(|_| AuthError::InvalidToken)
+        self.sub.parse().map_err(|_| AuthError::InvalidToken)
     }
 
     /// Returns true if the token is expired.

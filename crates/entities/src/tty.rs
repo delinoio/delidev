@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Type of TTY input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TtyInputType {
     /// Free-form text input.
+    #[default]
     Text,
     /// Select from options.
     Select,
@@ -18,17 +19,12 @@ pub enum TtyInputType {
     Password,
 }
 
-impl Default for TtyInputType {
-    fn default() -> Self {
-        Self::Text
-    }
-}
-
 /// Status of a TTY input request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TtyInputStatus {
     /// Waiting for user response.
+    #[default]
     Pending,
     /// User has responded.
     Responded,
@@ -36,12 +32,6 @@ pub enum TtyInputStatus {
     Timeout,
     /// Request cancelled.
     Cancelled,
-}
-
-impl Default for TtyInputStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 /// A request for TTY input from an AI agent.

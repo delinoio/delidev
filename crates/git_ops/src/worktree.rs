@@ -57,7 +57,10 @@ pub trait WorktreeExt {
 impl WorktreeExt for GitRepository {
     fn list_worktrees(&self) -> GitResult<Vec<String>> {
         let worktrees = self.inner().worktrees()?;
-        Ok(worktrees.iter().filter_map(|s| s.map(String::from)).collect())
+        Ok(worktrees
+            .iter()
+            .filter_map(|s| s.map(String::from))
+            .collect())
     }
 
     fn create_worktree(
@@ -133,7 +136,7 @@ impl WorktreeExt for GitRepository {
         for name in self.list_worktrees()? {
             if let Ok(worktree) = self.inner().find_worktree(&name) {
                 // Only prune if not valid
-                if !worktree.validate().is_ok() {
+                if worktree.validate().is_err() {
                     let _ = worktree.prune(None);
                 }
             }
@@ -148,11 +151,7 @@ pub fn worktree_path_for_task(base_dir: impl AsRef<Path>, task_id: &str) -> Path
 }
 
 /// Generates a branch name from a task.
-pub fn branch_name_for_task(
-    task_id: &str,
-    slug: Option<&str>,
-    template: Option<&str>,
-) -> String {
+pub fn branch_name_for_task(task_id: &str, slug: Option<&str>, template: Option<&str>) -> String {
     let template = template.unwrap_or("delidev/${taskId}");
 
     let mut result = template.replace("${taskId}", task_id);
@@ -165,7 +164,13 @@ pub fn branch_name_for_task(
     // Clean up the branch name
     result
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == '/' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == '/' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect()
 }
 
@@ -175,10 +180,7 @@ mod tests {
 
     #[test]
     fn test_branch_name_generation() {
-        assert_eq!(
-            branch_name_for_task("abc123", None, None),
-            "delidev/abc123"
-        );
+        assert_eq!(branch_name_for_task("abc123", None, None), "delidev/abc123");
 
         assert_eq!(
             branch_name_for_task("abc123", Some("fix-bug"), Some("feature/${taskId}-${slug}")),

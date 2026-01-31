@@ -1,7 +1,6 @@
 //! In-memory task store implementation for testing.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use entities::{
@@ -310,10 +309,7 @@ impl TaskStore for MemoryTaskStore {
     async fn update_agent_task(&self, task: AgentTask) -> TaskStoreResult<AgentTask> {
         let mut tasks = self.agent_tasks.write().await;
         if !tasks.contains_key(&task.id) {
-            return Err(TaskStoreError::not_found(
-                "AgentTask",
-                task.id.to_string(),
-            ));
+            return Err(TaskStoreError::not_found("AgentTask", task.id.to_string()));
         }
         tasks.insert(task.id, task.clone());
         Ok(task)
@@ -348,10 +344,7 @@ impl TaskStore for MemoryTaskStore {
         Ok(sessions.get(&id).cloned())
     }
 
-    async fn list_agent_sessions(
-        &self,
-        agent_task_id: Uuid,
-    ) -> TaskStoreResult<Vec<AgentSession>> {
+    async fn list_agent_sessions(&self, agent_task_id: Uuid) -> TaskStoreResult<Vec<AgentSession>> {
         let sessions = self.agent_sessions.read().await;
         Ok(sessions
             .values()
@@ -433,10 +426,7 @@ impl TaskStore for MemoryTaskStore {
     async fn update_unit_task(&self, task: UnitTask) -> TaskStoreResult<UnitTask> {
         let mut tasks = self.unit_tasks.write().await;
         if !tasks.contains_key(&task.id) {
-            return Err(TaskStoreError::not_found(
-                "UnitTask",
-                task.id.to_string(),
-            ));
+            return Err(TaskStoreError::not_found("UnitTask", task.id.to_string()));
         }
         tasks.insert(task.id, task.clone());
         Ok(task)
@@ -641,10 +631,7 @@ impl TaskStore for MemoryTaskStore {
     async fn update_todo_item(&self, item: TodoItem) -> TaskStoreResult<TodoItem> {
         let mut items = self.todo_items.write().await;
         if !items.contains_key(&item.id) {
-            return Err(TaskStoreError::not_found(
-                "TodoItem",
-                item.id.to_string(),
-            ));
+            return Err(TaskStoreError::not_found("TodoItem", item.id.to_string()));
         }
         items.insert(item.id, item.clone());
         Ok(item)
@@ -733,10 +720,7 @@ impl TaskStore for MemoryTaskStore {
     async fn delete_tty_input_request(&self, id: Uuid) -> TaskStoreResult<()> {
         let mut requests = self.tty_input_requests.write().await;
         if requests.remove(&id).is_none() {
-            return Err(TaskStoreError::not_found(
-                "TtyInputRequest",
-                id.to_string(),
-            ));
+            return Err(TaskStoreError::not_found("TtyInputRequest", id.to_string()));
         }
         Ok(())
     }
@@ -832,10 +816,7 @@ mod tests {
         assert_eq!(fetched.prompt, "Fix the bug");
 
         // List
-        let (tasks, count) = store
-            .list_unit_tasks(TaskFilter::default())
-            .await
-            .unwrap();
+        let (tasks, count) = store.list_unit_tasks(TaskFilter::default()).await.unwrap();
         assert_eq!(count, 1);
         assert_eq!(tasks.len(), 1);
 

@@ -151,15 +151,13 @@ impl GitRepository {
             self.repo.head()?.peel_to_commit()?
         };
 
-        self.repo
-            .branch(name, &commit, false)
-            .map_err(|e| {
-                if e.code() == git2::ErrorCode::Exists {
-                    GitError::BranchExists(name.to_string())
-                } else {
-                    GitError::Git2(e)
-                }
-            })?;
+        self.repo.branch(name, &commit, false).map_err(|e| {
+            if e.code() == git2::ErrorCode::Exists {
+                GitError::BranchExists(name.to_string())
+            } else {
+                GitError::Git2(e)
+            }
+        })?;
 
         Ok(())
     }
@@ -190,11 +188,7 @@ impl GitRepository {
             let head_commit = head.peel_to_commit()?;
             let branch_commit = branch.get().peel_to_commit()?;
 
-            if self
-                .repo
-                .merge_base(head_commit.id(), branch_commit.id())?
-                == branch_commit.id()
-            {
+            if self.repo.merge_base(head_commit.id(), branch_commit.id())? == branch_commit.id() {
                 branch.delete()?;
             } else {
                 return Err(GitError::Other(format!(
@@ -230,12 +224,11 @@ impl GitRepository {
     /// Returns the default branch name (usually main or master).
     pub fn default_branch(&self) -> GitResult<String> {
         // Try to get from origin/HEAD
-        if let Ok(reference) = self.repo.find_reference("refs/remotes/origin/HEAD") {
-            if let Ok(resolved) = reference.resolve() {
-                if let Some(name) = resolved.shorthand() {
-                    return Ok(name.trim_start_matches("origin/").to_string());
-                }
-            }
+        if let Ok(reference) = self.repo.find_reference("refs/remotes/origin/HEAD")
+            && let Ok(resolved) = reference.resolve()
+            && let Some(name) = resolved.shorthand()
+        {
+            return Ok(name.trim_start_matches("origin/").to_string());
         }
 
         // Fallback: try main, then master
@@ -283,10 +276,10 @@ fn create_callbacks(credentials: GitCredentials) -> RemoteCallbacks<'static> {
             }
             GitCredentials::Default => {
                 // Try SSH agent first
-                if allowed_types.contains(git2::CredentialType::SSH_KEY) {
-                    if let Some(username) = username_from_url {
-                        return Cred::ssh_key_from_agent(username);
-                    }
+                if allowed_types.contains(git2::CredentialType::SSH_KEY)
+                    && let Some(username) = username_from_url
+                {
+                    return Cred::ssh_key_from_agent(username);
                 }
 
                 // Try default credentials
@@ -300,9 +293,11 @@ fn create_callbacks(credentials: GitCredentials) -> RemoteCallbacks<'static> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
     use tempfile::tempdir;
+
+    use super::*;
 
     #[test]
     fn test_init_and_open() {
@@ -340,9 +335,9 @@ mod tests {
             .unwrap();
 
         // Checkout HEAD to reset the working directory state
-        repo.inner().checkout_head(Some(
-            git2::build::CheckoutBuilder::new().force()
-        )).unwrap();
+        repo.inner()
+            .checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
+            .unwrap();
 
         // Test branch creation
         repo.create_branch("feature", None).unwrap();
