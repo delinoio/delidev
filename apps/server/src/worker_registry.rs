@@ -235,7 +235,7 @@ mod tests {
 
         let worker = registry.register(
             "worker-1".to_string(),
-            "127.0.0.1:9000".to_string(),
+            "127.0.0.1:54872".to_string(),
             test_capacity(),
         );
 
@@ -249,7 +249,7 @@ mod tests {
 
         registry.register(
             "worker-1".to_string(),
-            "127.0.0.1:9000".to_string(),
+            "127.0.0.1:54872".to_string(),
             test_capacity(),
         );
         registry.register(
@@ -273,7 +273,7 @@ mod tests {
 
         registry.register(
             "worker-1".to_string(),
-            "127.0.0.1:9000".to_string(),
+            "127.0.0.1:54872".to_string(),
             test_capacity(),
         );
 
@@ -296,7 +296,7 @@ mod tests {
 
         registry.register(
             "worker-1".to_string(),
-            "127.0.0.1:9000".to_string(),
+            "127.0.0.1:54872".to_string(),
             test_capacity(),
         );
 

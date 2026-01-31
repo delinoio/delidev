@@ -1587,8 +1587,8 @@ Common error scenarios and their resolutions.
 | Service | Description | Port |
 |---------|-------------|------|
 | `postgres` | PostgreSQL database for multi-user mode | 5432 |
-| `server` | DeliDev main server (optional, for containerized deployment) | 8080 |
-| `worker` | DeliDev worker (optional, for containerized deployment) | 9000 |
+| `server` | DeliDev main server (optional, for containerized deployment) | 54871 |
+| `worker` | DeliDev worker (optional, for containerized deployment) | 54872 |
 
 ### Environment Variables
 

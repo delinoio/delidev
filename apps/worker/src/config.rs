@@ -45,11 +45,11 @@ pub struct WorkerConfig {
 }
 
 fn default_server_url() -> String {
-    "http://localhost:8080".to_string()
+    "http://localhost:54871".to_string()
 }
 
 fn default_bind_address() -> String {
-    "0.0.0.0:9000".to_string()
+    "0.0.0.0:54872".to_string()
 }
 
 fn default_max_concurrent_tasks() -> u32 {
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = WorkerConfig::default();
-        assert_eq!(config.main_server_url, "http://localhost:8080");
+        assert_eq!(config.main_server_url, "http://localhost:54871");
         assert_eq!(config.max_concurrent_tasks, 4);
         assert!(config.use_container);
     }

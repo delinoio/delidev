@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Server configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
-    /// Server bind address (e.g., "0.0.0.0:8080")
+    /// Server bind address (e.g., "0.0.0.0:54871")
     #[serde(default = "default_bind_address")]
     pub bind_address: String,
 
@@ -91,7 +91,7 @@ fn default_oidc_scopes() -> Vec<String> {
 }
 
 fn default_bind_address() -> String {
-    "0.0.0.0:8080".to_string()
+    "0.0.0.0:54871".to_string()
 }
 
 fn default_database_path() -> PathBuf {
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = ServerConfig::default();
-        assert_eq!(config.bind_address, "0.0.0.0:8080");
+        assert_eq!(config.bind_address, "0.0.0.0:54871");
         assert!(!config.single_user_mode);
         assert_eq!(config.jwt_expiration_hours, 24);
     }

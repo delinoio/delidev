@@ -46,7 +46,7 @@ export class RpcError extends Error {
 // ========== Configuration ==========
 
 export interface RpcClientConfig {
-  /** Server URL (e.g., "http://localhost:8080") */
+  /** Server URL (e.g., "http://localhost:54871") */
   serverUrl: string;
   /** Optional auth token */
   authToken?: string;

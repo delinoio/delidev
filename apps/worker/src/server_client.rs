@@ -214,13 +214,13 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let client = MainServerClient::new("http://localhost:8080");
-        assert_eq!(client.server_url, "http://localhost:8080");
+        let client = MainServerClient::new("http://localhost:54871");
+        assert_eq!(client.server_url, "http://localhost:54871");
     }
 
     #[test]
     fn test_next_id() {
-        let client = MainServerClient::new("http://localhost:8080");
+        let client = MainServerClient::new("http://localhost:54871");
         assert_eq!(client.next_id(), "1");
         assert_eq!(client.next_id(), "2");
         assert_eq!(client.next_id(), "3");

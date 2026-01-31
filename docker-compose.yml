@@ -46,13 +46,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DELIDEV_BIND_ADDRESS=0.0.0.0:8080
+      - DELIDEV_BIND_ADDRESS=0.0.0.0:54871
       - DELIDEV_SINGLE_USER_MODE=false
       - DATABASE_URL=postgres://delidev:delidev@postgres:5432/delidev
       - DELIDEV_JWT_SECRET=${DELIDEV_JWT_SECRET:-change-me-in-production}
       - DELIDEV_LOG_LEVEL=${DELIDEV_LOG_LEVEL:-info}
     ports:
-      - "8080:8080"
+      - "54871:54871"
     restart: unless-stopped
 
   # DeliDev Worker (optional - usually run with cargo for development)
@@ -67,8 +67,8 @@ services:
     depends_on:
       - server
     environment:
-      - DELIDEV_SERVER_URL=http://server:8080
-      - DELIDEV_WORKER_BIND_ADDRESS=0.0.0.0:9000
+      - DELIDEV_SERVER_URL=http://server:54871
+      - DELIDEV_WORKER_BIND_ADDRESS=0.0.0.0:54872
       - DELIDEV_CONTAINER_RUNTIME=docker
       - DELIDEV_USE_CONTAINER=false
       - DELIDEV_LOG_LEVEL=${DELIDEV_LOG_LEVEL:-info}
@@ -78,7 +78,7 @@ services:
       # Mount worktree directory
       - worker_worktrees:/tmp/delidev/worktrees
     ports:
-      - "9000:9000"
+      - "54872:54872"
     restart: unless-stopped
 
 volumes:
