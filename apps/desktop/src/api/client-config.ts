@@ -61,7 +61,6 @@ export function getEnvConfig(): ServerConfig | null {
  */
 export function shouldSkipModeSelection(): boolean {
   const skipSelection = import.meta.env.PUBLIC_SKIP_MODE_SELECTION;
-  console.log("skipSelection", skipSelection);
   return skipSelection === "true" || skipSelection === "1";
 }
 
